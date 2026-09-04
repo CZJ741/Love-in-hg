@@ -1,0 +1,92 @@
+<!-- components/filter-bar/filter-bar.wxml -->
+<view class="filter-bar">
+  <!-- 筛选头部 -->
+  <view class="filter-header" bindtap="onToggle">
+    <view class="filter-header-left">
+      <text class="filter-icon">🔍</text>
+      <text class="filter-title">筛选条件</text>
+      <view class="filter-badge" wx:if="{{activeCount > 0}}">{{activeCount}}</view>
+    </view>
+    <view class="filter-header-right">
+      <text class="filter-toggle">{{expanded ? '收起 ▲' : '展开 ▼'}}</text>
+    </view>
+  </view>
+
+  <!-- 已选条件标签 -->
+  <view class="active-tags" wx:if="{{activeCount > 0 && !expanded}}">
+    <text class="active-tag" wx:if="{{tempFilter.gender}}">性别: {{tempFilter.gender}}</text>
+    <text class="active-tag" wx:if="{{tempFilter.ageRange}}">年龄: {{tempFilter.ageRange}}岁</text>
+    <text class="active-tag" wx:if="{{tempFilter.heightRange}}">身高: {{tempFilter.heightRange}}cm</text>
+    <text class="active-tag" wx:if="{{tempFilter.income}}">收入: {{tempFilter.income}}</text>
+    <text class="active-tag" wx:if="{{tempFilter.isPublicSector !== undefined}}">{{tempFilter.isPublicSector ? '体制内' : '非体制内'}}</text>
+  </view>
+
+  <!-- 筛选面板 -->
+  <view class="filter-panel" wx:if="{{expanded}}">
+    <!-- 性别 -->
+    <view class="filter-row">
+      <text class="filter-label">性别</text>
+      <view class="filter-options">
+        <view class="option-item {{!tempFilter.gender ? 'active' : ''}}" data-key="gender" data-value="" bindtap="onFilter">不限</view>
+        <view class="option-item {{tempFilter.gender === '男' ? 'active' : ''}}" data-key="gender" data-value="男" bindtap="onFilter">男</view>
+        <view class="option-item {{tempFilter.gender === '女' ? 'active' : ''}}" data-key="gender" data-value="女" bindtap="onFilter">女</view>
+      </view>
+    </view>
+
+    <!-- 年龄 -->
+    <view class="filter-row">
+      <text class="filter-label">年龄</text>
+      <view class="filter-options">
+        <view class="option-item {{!tempFilter.ageRange ? 'active' : ''}}" data-key="ageRange" data-value="" bindtap="onFilter">不限</view>
+        <view class="option-item {{tempFilter.ageRange === '22-25' ? 'active' : ''}}" data-key="ageRange" data-value="22-25" bindtap="onFilter">22-25</view>
+        <view class="option-item {{tempFilter.ageRange === '26-30' ? 'active' : ''}}" data-key="ageRange" data-value="26-30" bindtap="onFilter">26-30</view>
+        <view class="option-item {{tempFilter.ageRange === '31-35' ? 'active' : ''}}" data-key="ageRange" data-value="31-35" bindtap="onFilter">31-35</view>
+        <view class="option-item {{tempFilter.ageRange === '36-40' ? 'active' : ''}}" data-key="ageRange" data-value="36-40" bindtap="onFilter">36-40</view>
+        <view class="option-item {{tempFilter.ageRange === '41-50' ? 'active' : ''}}" data-key="ageRange" data-value="41-50" bindtap="onFilter">41-50</view>
+      </view>
+    </view>
+
+    <!-- 身高 -->
+    <view class="filter-row">
+      <text class="filter-label">身高</text>
+      <view class="filter-options">
+        <view class="option-item {{!tempFilter.heightRange ? 'active' : ''}}" data-key="heightRange" data-value="" bindtap="onFilter">不限</view>
+        <view class="option-item {{tempFilter.heightRange === '150-160' ? 'active' : ''}}" data-key="heightRange" data-value="150-160" bindtap="onFilter">150-160</view>
+        <view class="option-item {{tempFilter.heightRange === '160-170' ? 'active' : ''}}" data-key="heightRange" data-value="160-170" bindtap="onFilter">160-170</view>
+        <view class="option-item {{tempFilter.heightRange === '170-180' ? 'active' : ''}}" data-key="heightRange" data-value="170-180" bindtap="onFilter">170-180</view>
+        <view class="option-item {{tempFilter.heightRange === '180-190' ? 'active' : ''}}" data-key="heightRange" data-value="180-190" bindtap="onFilter">180-190</view>
+      </view>
+    </view>
+
+    <!-- 体制内 -->
+    <view class="filter-row">
+      <text class="filter-label">体制内</text>
+      <view class="filter-options">
+        <view class="option-item {{tempFilter.isPublicSector === undefined ? 'active' : ''}}" data-key="isPublicSector" data-value="" bindtap="onFilter">不限</view>
+        <view class="option-item {{tempFilter.isPublicSector === true ? 'active' : ''}}" data-key="isPublicSector" data-value="true" bindtap="onFilter">是</view>
+        <view class="option-item {{tempFilter.isPublicSector === false ? 'active' : ''}}" data-key="isPublicSector" data-value="false" bindtap="onFilter">否</view>
+      </view>
+    </view>
+
+    <!-- 收入 -->
+    <view class="filter-row">
+      <text class="filter-label">收入</text>
+      <view class="filter-options income-options">
+        <view class="option-item {{!tempFilter.income ? 'active' : ''}}" data-key="income" data-value="" bindtap="onFilter">不限</view>
+        <view class="option-item {{tempFilter.income === '3万以下' ? 'active' : ''}}" data-key="income" data-value="3万以下" bindtap="onFilter">3万以下</view>
+        <view class="option-item {{tempFilter.income === '3-5万' ? 'active' : ''}}" data-key="income" data-value="3-5万" bindtap="onFilter">3-5万</view>
+        <view class="option-item {{tempFilter.income === '5-10万' ? 'active' : ''}}" data-key="income" data-value="5-10万" bindtap="onFilter">5-10万</view>
+        <view class="option-item {{tempFilter.income === '10-20万' ? 'active' : ''}}" data-key="income" data-value="10-20万" bindtap="onFilter">10-20万</view>
+        <view class="option-item {{tempFilter.income === '20-30万' ? 'active' : ''}}" data-key="income" data-value="20-30万" bindtap="onFilter">20-30万</view>
+        <view class="option-item {{tempFilter.income === '30-50万' ? 'active' : ''}}" data-key="income" data-value="30-50万" bindtap="onFilter">30-50万</view>
+        <view class="option-item {{tempFilter.income === '50万以上' ? 'active' : ''}}" data-key="income" data-value="50万以上" bindtap="onFilter">50万以上</view>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="filter-actions">
+      <view class="btn-reset" bindtap="onReset">重置</view>
+      <view class="btn-confirm" bindtap="onConfirm">确认</view>
+    </view>
+  </view>
+</view>

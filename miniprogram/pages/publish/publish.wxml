@@ -1,0 +1,32 @@
+<!-- pages/publish/publish.wxml -->
+<view class="container">
+  <view class="publish-header card">
+    <text class="publish-title">我的启事</text>
+    <text class="publish-desc">管理您发布的启事，点击编辑可修改信息</text>
+  </view>
+
+  <!-- 我的启事列表 -->
+  <view class="form-section card">
+    <view class="section-title">我的启事（{{myNotices.length}}条）</view>
+
+    <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+
+    <view class="empty-tip" wx:if="{{myNotices.length === 0 && !loading}}">
+      <text>还没有发布过启事</text>
+      <text class="empty-sub">点击下方按钮发布您的第一条启事吧</text>
+    </view>
+
+    <view class="my-notice-item" wx:for="{{myNotices}}" wx:key="id">
+      <view class="my-notice-info">
+        <text class="my-notice-name">{{item.name}} <text class="my-notice-gender">{{item.gender}}</text></text>
+        <text class="my-notice-detail">{{item.birthday || '未填生日'}} · {{item.occupation || '职业未填'}} · {{item.income || '收入未填'}}</text>
+      </view>
+      <view class="my-notice-actions">
+        <text class="my-notice-edit" bindtap="onEditNotice" data-notice="{{item}}">编辑</text>
+        <text class="my-notice-delete" bindtap="onDeleteNotice" data-id="{{item.id}}" data-name="{{item.name}}">删除</text>
+      </view>
+    </view>
+  </view>
+
+  <button class="btn-primary submit-btn" bindtap="onNewNotice">+ 新增启事</button>
+</view>

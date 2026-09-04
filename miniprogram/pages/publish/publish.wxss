@@ -1,0 +1,131 @@
+/* pages/publish/publish.wxss */
+.publish-header {
+  text-align: center;
+  padding: 40rpx;
+}
+
+.publish-title {
+  font-size: 38rpx;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.publish-desc {
+  font-size: 26rpx;
+  color: #999;
+}
+
+/* 列表卡片 */
+.form-section {
+  margin-bottom: 20rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  margin-bottom: 24rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+/* 我的启事列表 */
+.my-notice-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.my-notice-item:last-child {
+  border-bottom: none;
+}
+
+.my-notice-info {
+  flex: 1;
+  margin-right: 20rpx;
+  overflow: hidden;
+}
+
+.my-notice-name {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.my-notice-gender {
+  font-size: 24rpx;
+  color: #e74c3c;
+  font-weight: normal;
+  margin-left: 8rpx;
+  padding: 2rpx 12rpx;
+  background: #fce4ec;
+  border-radius: 6rpx;
+}
+
+.my-notice-detail {
+  font-size: 24rpx;
+  color: #999;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.my-notice-edit {
+  font-size: 26rpx;
+  color: #e74c3c;
+  padding: 10rpx 24rpx;
+  border: 1rpx solid #e74c3c;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+}
+
+/* 操作按钮区 */
+.my-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex-shrink: 0;
+}
+
+.my-notice-delete {
+  font-size: 26rpx;
+  color: #999;
+  padding: 10rpx 24rpx;
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+}
+
+/* 空状态 */
+.empty-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.empty-sub {
+  font-size: 24rpx;
+  color: #bbb;
+  margin-top: 12rpx;
+}
+
+/* 加载中 */
+.loading-tip {
+  text-align: center;
+  padding: 40rpx 0;
+  color: #999;
+  font-size: 26rpx;
+}
+
+/* 新增按钮 */
+.submit-btn {
+  margin-top: 30rpx;
+  width: 100%;
+}

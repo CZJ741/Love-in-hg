@@ -1,0 +1,43 @@
+<!-- components/notice-card/notice-card.wxml -->
+<view class="notice-card card {{notice.gender === '男' ? 'gender-male' : 'gender-female'}}" bindtap="onTap">
+  <view class="card-header flex-between">
+    <view class="flex-row">
+      <text class="name">{{notice.name}}</text>
+      <text class="gender {{notice.gender === '男' ? 'male' : 'female'}}">{{notice.gender}}</text>
+      <text class="age">{{age}}岁</text>
+    </view>
+    <text class="height" wx:if="{{notice.height}}">{{notice.height}}cm</text>
+  </view>
+  <view class="card-body">
+    <view class="info-row" wx:if="{{notice.occupation}}">
+      <text class="label">职业</text>
+      <text class="value">{{notice.occupation}}</text>
+    </view>
+    <view class="info-row sector-row" wx:if="{{notice.isPublicSector}}">
+      <text class="label">体制内</text>
+      <text class="value"><text class="sector-badge">是</text></text>
+    </view>
+    <view class="info-row" wx:if="{{notice.income}}">
+      <text class="label">收入</text>
+      <text class="value">{{notice.income}}</text>
+    </view>
+    <view class="info-row" wx:if="{{notice.birthday}}">
+      <text class="label">生日</text>
+      <text class="value">{{notice.birthday}}</text>
+    </view>
+    <view class="info-row" wx:if="{{notice.weight}}">
+      <text class="label">体重</text>
+      <text class="value">{{notice.weight}}kg</text>
+    </view>
+  </view>
+  <view class="card-footer" wx:if="{{showPhone}}">
+    <text class="phone">{{notice.phone}}</text>
+  </view>
+  <view class="card-footer phone-action" wx:if="{{!showPhone && !hidePhoneAction}}">
+    <text class="phone-hint" catchtap="onShowPhone">点击查看联系方式</text>
+  </view>
+  <view class="card-remark" wx:if="{{notice.remark}}">
+    <text class="remark-label">备注</text>
+    <text class="remark-text">{{notice.remark}}</text>
+  </view>
+</view>

@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "filter-bar": "/components/filter-bar/filter-bar",
+    "notice-card": "/components/notice-card/notice-card"
+  },
+  "navigationBarTitleText": "启事"
+}
