@@ -14,22 +14,29 @@
 
   <!-- 已选条件标签 -->
   <view class="active-tags" wx:if="{{activeCount > 0 && !expanded}}">
-    <text class="active-tag" wx:if="{{tempFilter.gender}}">性别: {{tempFilter.gender}}</text>
+    <text class="active-tag" wx:if="{{tempFilter.housingLocation}}">住房: {{tempFilter.housingLocation}}</text>
     <text class="active-tag" wx:if="{{tempFilter.ageRange}}">年龄: {{tempFilter.ageRange}}岁</text>
     <text class="active-tag" wx:if="{{tempFilter.heightRange}}">身高: {{tempFilter.heightRange}}cm</text>
-    <text class="active-tag" wx:if="{{tempFilter.income}}">收入: {{tempFilter.income}}</text>
+    <text class="active-tag" wx:if="{{tempFilter.weightRange}}">体重: {{tempFilter.weightRange}}kg</text>
     <text class="active-tag" wx:if="{{tempFilter.isPublicSector !== undefined}}">{{tempFilter.isPublicSector ? '体制内' : '非体制内'}}</text>
+    <text class="active-tag" wx:if="{{tempFilter.income}}">收入: {{tempFilter.income}}</text>
   </view>
 
   <!-- 筛选面板 -->
   <view class="filter-panel" wx:if="{{expanded}}">
-    <!-- 性别 -->
+    <!-- 基础必填筛选组（所有用户开放） -->
+    <view class="filter-section-title">
+      <text class="section-title-text">基础筛选</text>
+      <text class="section-title-tag tag-free">全员可用</text>
+    </view>
+
+    <!-- 住房位置 -->
     <view class="filter-row">
-      <text class="filter-label">性别</text>
+      <text class="filter-label">住房位置</text>
       <view class="filter-options">
-        <view class="option-item {{!tempFilter.gender ? 'active' : ''}}" data-key="gender" data-value="" bindtap="onFilter">不限</view>
-        <view class="option-item {{tempFilter.gender === '男' ? 'active' : ''}}" data-key="gender" data-value="男" bindtap="onFilter">男</view>
-        <view class="option-item {{tempFilter.gender === '女' ? 'active' : ''}}" data-key="gender" data-value="女" bindtap="onFilter">女</view>
+        <view class="option-item {{!tempFilter.housingLocation ? 'active' : ''}}" data-key="housingLocation" data-value="" bindtap="onFilter">不限</view>
+        <view class="option-item {{tempFilter.housingLocation === '本地' ? 'active' : ''}}" data-key="housingLocation" data-value="本地" bindtap="onFilter">本地</view>
+        <view class="option-item {{tempFilter.housingLocation === '外地' ? 'active' : ''}}" data-key="housingLocation" data-value="外地" bindtap="onFilter">外地</view>
       </view>
     </view>
 
@@ -38,23 +45,47 @@
       <text class="filter-label">年龄</text>
       <view class="filter-options">
         <view class="option-item {{!tempFilter.ageRange ? 'active' : ''}}" data-key="ageRange" data-value="" bindtap="onFilter">不限</view>
-        <view class="option-item {{tempFilter.ageRange === '22-25' ? 'active' : ''}}" data-key="ageRange" data-value="22-25" bindtap="onFilter">22-25</view>
-        <view class="option-item {{tempFilter.ageRange === '26-30' ? 'active' : ''}}" data-key="ageRange" data-value="26-30" bindtap="onFilter">26-30</view>
-        <view class="option-item {{tempFilter.ageRange === '31-35' ? 'active' : ''}}" data-key="ageRange" data-value="31-35" bindtap="onFilter">31-35</view>
-        <view class="option-item {{tempFilter.ageRange === '36-40' ? 'active' : ''}}" data-key="ageRange" data-value="36-40" bindtap="onFilter">36-40</view>
-        <view class="option-item {{tempFilter.ageRange === '41-50' ? 'active' : ''}}" data-key="ageRange" data-value="41-50" bindtap="onFilter">41-50</view>
+        <view class="option-item {{tempFilter.ageRange === '18-25' ? 'active' : ''}}" data-key="ageRange" data-value="18-25" bindtap="onFilter">18-25岁</view>
+        <view class="option-item {{tempFilter.ageRange === '26-30' ? 'active' : ''}}" data-key="ageRange" data-value="26-30" bindtap="onFilter">26-30岁</view>
+        <view class="option-item {{tempFilter.ageRange === '31-35' ? 'active' : ''}}" data-key="ageRange" data-value="31-35" bindtap="onFilter">31-35岁</view>
+        <view class="option-item {{tempFilter.ageRange === '36-40' ? 'active' : ''}}" data-key="ageRange" data-value="36-40" bindtap="onFilter">36-40岁</view>
+        <view class="option-item {{tempFilter.ageRange === '41-50' ? 'active' : ''}}" data-key="ageRange" data-value="41-50" bindtap="onFilter">41-50岁</view>
+        <view class="option-item {{tempFilter.ageRange === '50-100' ? 'active' : ''}}" data-key="ageRange" data-value="50-100" bindtap="onFilter">50岁以上</view>
       </view>
+    </view>
+
+    <!-- 会员专享筛选组（身高、体重、体制内、收入、职业） -->
+    <view class="filter-section-title mt-section">
+      <view class="section-title-left">
+        <text class="section-title-text">选填进阶筛选</text>
+        <text class="section-title-tag tag-vip">👑 会员专享</text>
+      </view>
+      <text class="vip-upgrade-hint" wx:if="{{membershipType !== 'member' && membershipType !== 'vip'}}">升级会员解锁</text>
     </view>
 
     <!-- 身高 -->
     <view class="filter-row">
-      <text class="filter-label">身高</text>
+      <text class="filter-label">身高 (cm)</text>
       <view class="filter-options">
-        <view class="option-item {{!tempFilter.heightRange ? 'active' : ''}}" data-key="heightRange" data-value="" bindtap="onFilter">不限</view>
-        <view class="option-item {{tempFilter.heightRange === '150-160' ? 'active' : ''}}" data-key="heightRange" data-value="150-160" bindtap="onFilter">150-160</view>
-        <view class="option-item {{tempFilter.heightRange === '160-170' ? 'active' : ''}}" data-key="heightRange" data-value="160-170" bindtap="onFilter">160-170</view>
-        <view class="option-item {{tempFilter.heightRange === '170-180' ? 'active' : ''}}" data-key="heightRange" data-value="170-180" bindtap="onFilter">170-180</view>
-        <view class="option-item {{tempFilter.heightRange === '180-190' ? 'active' : ''}}" data-key="heightRange" data-value="180-190" bindtap="onFilter">180-190</view>
+        <view class="option-item {{!tempFilter.heightRange ? 'active' : ''}}" data-key="heightRange" data-value="" bindtap="onMemberFilter">不限</view>
+        <view class="option-item {{tempFilter.heightRange === '150-160' ? 'active' : ''}}" data-key="heightRange" data-value="150-160" bindtap="onMemberFilter">150-160</view>
+        <view class="option-item {{tempFilter.heightRange === '160-170' ? 'active' : ''}}" data-key="heightRange" data-value="160-170" bindtap="onMemberFilter">160-170</view>
+        <view class="option-item {{tempFilter.heightRange === '170-180' ? 'active' : ''}}" data-key="heightRange" data-value="170-180" bindtap="onMemberFilter">170-180</view>
+        <view class="option-item {{tempFilter.heightRange === '180-190' ? 'active' : ''}}" data-key="heightRange" data-value="180-190" bindtap="onMemberFilter">180-190</view>
+        <view class="option-item {{tempFilter.heightRange === '190-220' ? 'active' : ''}}" data-key="heightRange" data-value="190-220" bindtap="onMemberFilter">190以上</view>
+      </view>
+    </view>
+
+    <!-- 体重 -->
+    <view class="filter-row">
+      <text class="filter-label">体重 (kg)</text>
+      <view class="filter-options">
+        <view class="option-item {{!tempFilter.weightRange ? 'active' : ''}}" data-key="weightRange" data-value="" bindtap="onMemberFilter">不限</view>
+        <view class="option-item {{tempFilter.weightRange === '40-50' ? 'active' : ''}}" data-key="weightRange" data-value="40-50" bindtap="onMemberFilter">50以下</view>
+        <view class="option-item {{tempFilter.weightRange === '50-60' ? 'active' : ''}}" data-key="weightRange" data-value="50-60" bindtap="onMemberFilter">50-60</view>
+        <view class="option-item {{tempFilter.weightRange === '60-70' ? 'active' : ''}}" data-key="weightRange" data-value="60-70" bindtap="onMemberFilter">60-70</view>
+        <view class="option-item {{tempFilter.weightRange === '70-80' ? 'active' : ''}}" data-key="weightRange" data-value="70-80" bindtap="onMemberFilter">70-80</view>
+        <view class="option-item {{tempFilter.weightRange === '80-150' ? 'active' : ''}}" data-key="weightRange" data-value="80-150" bindtap="onMemberFilter">80以上</view>
       </view>
     </view>
 
@@ -62,9 +93,9 @@
     <view class="filter-row">
       <text class="filter-label">体制内</text>
       <view class="filter-options">
-        <view class="option-item {{tempFilter.isPublicSector === undefined ? 'active' : ''}}" data-key="isPublicSector" data-value="" bindtap="onFilter">不限</view>
-        <view class="option-item {{tempFilter.isPublicSector === true ? 'active' : ''}}" data-key="isPublicSector" data-value="true" bindtap="onFilter">是</view>
-        <view class="option-item {{tempFilter.isPublicSector === false ? 'active' : ''}}" data-key="isPublicSector" data-value="false" bindtap="onFilter">否</view>
+        <view class="option-item {{tempFilter.isPublicSector === undefined ? 'active' : ''}}" data-key="isPublicSector" data-value="" bindtap="onMemberFilter">不限</view>
+        <view class="option-item {{tempFilter.isPublicSector === true ? 'active' : ''}}" data-key="isPublicSector" data-value="true" bindtap="onMemberFilter">是</view>
+        <view class="option-item {{tempFilter.isPublicSector === false ? 'active' : ''}}" data-key="isPublicSector" data-value="false" bindtap="onMemberFilter">否</view>
       </view>
     </view>
 
@@ -72,14 +103,14 @@
     <view class="filter-row">
       <text class="filter-label">收入</text>
       <view class="filter-options income-options">
-        <view class="option-item {{!tempFilter.income ? 'active' : ''}}" data-key="income" data-value="" bindtap="onFilter">不限</view>
-        <view class="option-item {{tempFilter.income === '3万以下' ? 'active' : ''}}" data-key="income" data-value="3万以下" bindtap="onFilter">3万以下</view>
-        <view class="option-item {{tempFilter.income === '3-5万' ? 'active' : ''}}" data-key="income" data-value="3-5万" bindtap="onFilter">3-5万</view>
-        <view class="option-item {{tempFilter.income === '5-10万' ? 'active' : ''}}" data-key="income" data-value="5-10万" bindtap="onFilter">5-10万</view>
-        <view class="option-item {{tempFilter.income === '10-20万' ? 'active' : ''}}" data-key="income" data-value="10-20万" bindtap="onFilter">10-20万</view>
-        <view class="option-item {{tempFilter.income === '20-30万' ? 'active' : ''}}" data-key="income" data-value="20-30万" bindtap="onFilter">20-30万</view>
-        <view class="option-item {{tempFilter.income === '30-50万' ? 'active' : ''}}" data-key="income" data-value="30-50万" bindtap="onFilter">30-50万</view>
-        <view class="option-item {{tempFilter.income === '50万以上' ? 'active' : ''}}" data-key="income" data-value="50万以上" bindtap="onFilter">50万以上</view>
+        <view class="option-item {{!tempFilter.income ? 'active' : ''}}" data-key="income" data-value="" bindtap="onMemberFilter">不限</view>
+        <view class="option-item {{tempFilter.income === '3万以下' ? 'active' : ''}}" data-key="income" data-value="3万以下" bindtap="onMemberFilter">3万以下</view>
+        <view class="option-item {{tempFilter.income === '3-5万' ? 'active' : ''}}" data-key="income" data-value="3-5万" bindtap="onMemberFilter">3-5万</view>
+        <view class="option-item {{tempFilter.income === '5-10万' ? 'active' : ''}}" data-key="income" data-value="5-10万" bindtap="onMemberFilter">5-10万</view>
+        <view class="option-item {{tempFilter.income === '10-20万' ? 'active' : ''}}" data-key="income" data-value="10-20万" bindtap="onMemberFilter">10-20万</view>
+        <view class="option-item {{tempFilter.income === '20-30万' ? 'active' : ''}}" data-key="income" data-value="20-30万" bindtap="onMemberFilter">20-30万</view>
+        <view class="option-item {{tempFilter.income === '30-50万' ? 'active' : ''}}" data-key="income" data-value="30-50万" bindtap="onMemberFilter">30-50万</view>
+        <view class="option-item {{tempFilter.income === '50万以上' ? 'active' : ''}}" data-key="income" data-value="50万以上" bindtap="onMemberFilter">50万以上</view>
       </view>
     </view>
 

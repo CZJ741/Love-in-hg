@@ -24,14 +24,27 @@ Component({
   },
 
   observers: {
-    'notice.birthday'(birthday) {
-      if (birthday) {
-        const birthYear = parseInt(birthday.split('-')[0]);
-        const now = new Date().getFullYear();
-        this.setData({ age: now - birthYear });
+    'notice.age, notice.birthday'(age, birthday) {
+      if (age && Number(age) > 0) {
+        this.setData({ age: Number(age) });
+        return;
       }
+      if (birthday) {
+        // 尝试从生日中匹配出4位年份
+        const match = String(birthday).match(/(\d{4})/);
+        if (match) {
+          const birthYear = parseInt(match[1]);
+          const now = new Date().getFullYear();
+          if (birthYear > 1900 && birthYear <= now) {
+            this.setData({ age: now - birthYear });
+            return;
+          }
+        }
+      }
+      this.setData({ age: 0 });
     }
   },
+
 
   methods: {
     onTap() {
@@ -40,6 +53,16 @@ Component({
 
     onShowPhone() {
       this.triggerEvent('showphone', { notice: this.data.notice });
+    },
+
+    onPreviewPhoto(e) {
+      const current = e.currentTarget.dataset.src;
+      const urls = this.data.notice.images || [];
+      wx.previewImage({
+        current,
+        urls
+      });
     }
   }
 });
+

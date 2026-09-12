@@ -3,6 +3,8 @@ import os
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
+# 加载 backend/.env 或当前目录 .env
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 load_dotenv()
 
 class Config:
@@ -43,7 +45,11 @@ class Config:
         'vip': 999,
     }
 
-    # 微信支付相关配置（占位，可在 .env 中配置）
+    # 上传文件配置
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
     WX_APP_ID = os.getenv('WX_APP_ID', '')               # 小程序 AppID
     WX_MCH_ID = os.getenv('WX_MCH_ID', '')               # 微信支付商户号
     WX_PAY_API_KEY = os.getenv('WX_PAY_API_KEY', '')     # 商户 API 密钥 (v2 apiKey 或 v3 APIv3Key)

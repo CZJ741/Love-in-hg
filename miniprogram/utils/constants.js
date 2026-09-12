@@ -39,7 +39,9 @@ const FIELD_LABELS = {
   name: '姓名',
   nickname: '昵称',
   gender: '性别',
+  age: '年龄',
   birthday: '生日',
+  socialAccount: '社交账号',
   occupation: '职业',
   income: '收入',
   isPublicSector: '是否体制内',
@@ -47,8 +49,8 @@ const FIELD_LABELS = {
   weight: '体重'
 };
 
-const REQUIRED_FIELDS = ['phone', 'name', 'gender', 'birthday'];
-const OPTIONAL_FIELDS = ['nickname', 'occupation', 'income', 'isPublicSector', 'height', 'weight'];
+const REQUIRED_FIELDS = ['phone', 'name', 'gender', 'age'];
+const OPTIONAL_FIELDS = ['nickname', 'socialAccount', 'occupation', 'income', 'isPublicSector', 'height', 'weight'];
 
 module.exports = {
   MEMBERSHIP_CONFIG,

@@ -45,18 +45,25 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS notices (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     user_id         INT          DEFAULT 0 COMMENT '发布用户ID(0=系统导入)',
-    phone           VARCHAR(11)  DEFAULT '' COMMENT '手机号码',
+    publisher_role  VARCHAR(20)  DEFAULT '本人' COMMENT '发布人身份(本人/父母/亲戚/朋友)',
+    phone           VARCHAR(11)  DEFAULT '' COMMENT '联系方式/手机号码',
     name            VARCHAR(20)  DEFAULT '' COMMENT '姓名',
     nickname        VARCHAR(50)  DEFAULT '' COMMENT '昵称',
     gender          VARCHAR(2)   DEFAULT '' COMMENT '性别',
-    birthday        VARCHAR(10)  DEFAULT '' COMMENT '生日',
+    age             INT          DEFAULT 0  COMMENT '年龄',
+    birthday        VARCHAR(20)  DEFAULT '' COMMENT '生日',
+    social_account  VARCHAR(100) DEFAULT '' COMMENT '社交账号',
+    housing_location VARCHAR(20) DEFAULT '本地' COMMENT '住房位置(本地/外地)',
     occupation      VARCHAR(50)  DEFAULT '' COMMENT '职业',
     income          VARCHAR(20)  DEFAULT '' COMMENT '收入',
     is_public_sector TINYINT(1)  DEFAULT 0 COMMENT '是否体制内',
     height          INT          DEFAULT 0 COMMENT '身高(cm)',
     weight          INT          DEFAULT 0 COMMENT '体重(kg)',
+    images          TEXT         COMMENT '照片列表(JSON数组，最多9张)',
     source          VARCHAR(20)  DEFAULT 'user' COMMENT '来源(user/seed/import)',
     remark          TEXT         COMMENT '备注',
+
+
 
     created_at      DATETIME     DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

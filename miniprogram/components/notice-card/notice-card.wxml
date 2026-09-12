@@ -4,12 +4,24 @@
     <view class="flex-row">
       <text class="name">{{notice.name}}</text>
       <text class="gender {{notice.gender === '男' ? 'male' : 'female'}}">{{notice.gender}}</text>
-      <text class="age">{{age}}岁</text>
+      <text class="age" wx:if="{{age}}">{{age}}岁</text>
     </view>
-    <text class="height" wx:if="{{notice.height}}">{{notice.height}}cm</text>
+    <view class="header-tags">
+      <text class="location-badge" wx:if="{{notice.housingLocation}}">{{notice.housingLocation}}房</text>
+      <text class="height" wx:if="{{notice.height}}">{{notice.height}}cm</text>
+    </view>
   </view>
   <view class="card-body">
+    <view class="info-row" wx:if="{{notice.publisherRole && notice.publisherRole !== '本人'}}">
+      <text class="label">发布人</text>
+      <text class="value">{{notice.publisherRole}}</text>
+    </view>
+    <view class="info-row" wx:if="{{notice.housingLocation}}">
+      <text class="label">住房</text>
+      <text class="value">{{notice.housingLocation}}</text>
+    </view>
     <view class="info-row" wx:if="{{notice.occupation}}">
+
       <text class="label">职业</text>
       <text class="value">{{notice.occupation}}</text>
     </view>
@@ -24,6 +36,10 @@
     <view class="info-row" wx:if="{{notice.birthday}}">
       <text class="label">生日</text>
       <text class="value">{{notice.birthday}}</text>
+    </view>
+    <view class="info-row" wx:if="{{notice.socialAccount}}">
+      <text class="label">社交账号</text>
+      <text class="value">{{notice.socialAccount}}</text>
     </view>
     <view class="info-row" wx:if="{{notice.weight}}">
       <text class="label">体重</text>
@@ -40,4 +56,18 @@
     <text class="remark-label">备注</text>
     <text class="remark-text">{{notice.remark}}</text>
   </view>
+  <view class="card-photos" wx:if="{{notice.images && notice.images.length > 0}}">
+    <view class="photos-grid">
+      <image
+        wx:for="{{notice.images}}"
+        wx:key="*this"
+        class="photo-thumb"
+        src="{{item}}"
+        mode="aspectFill"
+        catchtap="onPreviewPhoto"
+        data-src="{{item}}"
+      />
+    </view>
+  </view>
 </view>
+

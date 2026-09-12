@@ -19,7 +19,7 @@
     </view>
 
     <!-- 筛选栏 -->
-    <filter-bar filter="{{filter}}" bind:change="onFilterChange" />
+    <filter-bar filter="{{filter}}" membershipType="{{membershipType}}" bind:change="onFilterChange" />
 
     <!-- Tab 切换 -->
     <view class="tab-bar">

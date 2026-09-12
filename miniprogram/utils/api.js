@@ -175,6 +175,69 @@ function extractAndImport(text) {
   return post('/admin/extractAndImport', { text });
 }
 
+/**
+ * 上传单张图片
+ * @param {string} filePath 本地临时文件路径
+ * @returns {Promise<string>} 返回图片访问URL
+ */
+function uploadImage(filePath) {
+  const userId = wx.getStorageSync('userId') || '';
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: `${BASE_URL}/notice/upload`,
+      filePath,
+      name: 'file',
+      header: {
+        'X-User-Id': userId
+      },
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            const data = JSON.parse(res.data);
+            if (data.code === 0 && data.data && data.data.url) {
+              // 若返回的是相对路径，拼接 BASE_URL 前缀（去掉 /api）
+              let url = data.data.url;
+              if (url.startsWith('/')) {
+                const origin = BASE_URL.replace(/\/api\/?$/, '');
+                url = `${origin}${url}`;
+              }
+              resolve(url);
+            } else {
+              reject(new Error(data.msg || '上传失败'));
+            }
+          } catch (e) {
+            reject(new Error('解析上传结果失败'));
+          }
+        } else {
+          reject(new Error(`上传失败(${res.statusCode})`));
+        }
+      },
+      fail(err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+/**
+ * 批量上传多张图片
+ * @param {string[]} filePaths
+ * @returns {Promise<string[]>}
+ */
+async function uploadImages(filePaths) {
+  const urls = [];
+  for (const path of filePaths) {
+    // 如果已经是网络图片或已有URL则不需要重新上传
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      urls.push(path);
+    } else {
+      const url = await uploadImage(path);
+      urls.push(url);
+    }
+  }
+  return urls;
+}
+
 module.exports = {
   BASE_URL,
   request,
@@ -194,6 +257,9 @@ module.exports = {
   mockPaySuccess,
   requestPayment,
   deleteAccount,
-  extractAndImport
+  extractAndImport,
+  uploadImage,
+  uploadImages
 };
+
 

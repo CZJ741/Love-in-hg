@@ -19,7 +19,7 @@
     <view class="my-notice-item" wx:for="{{myNotices}}" wx:key="id">
       <view class="my-notice-info">
         <text class="my-notice-name">{{item.name}} <text class="my-notice-gender">{{item.gender}}</text></text>
-        <text class="my-notice-detail">{{item.birthday || '未填生日'}} · {{item.occupation || '职业未填'}} · {{item.income || '收入未填'}}</text>
+        <text class="my-notice-detail">{{item.age ? (item.age + '岁') : (item.birthday || '未填年龄')}} · {{item.occupation || '职业未填'}} · {{item.income || '收入未填'}}</text>
       </view>
       <view class="my-notice-actions">
         <text class="my-notice-edit" bindtap="onEditNotice" data-notice="{{item}}">编辑</text>

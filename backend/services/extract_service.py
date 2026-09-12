@@ -8,7 +8,9 @@ FIELD_MAP = {
     '姓名': 'name', '名字': 'name',
     '昵称': 'nickname',
     '性别': 'gender',
+    '年龄': 'age',
     '生日': 'birthday', '出生日期': 'birthday',
+    '社交账号': 'socialAccount', '微信号': 'socialAccount', '微信': 'socialAccount', 'QQ': 'socialAccount', 'qq': 'socialAccount',
     '职业': 'occupation', '工作': 'occupation',
     '收入': 'income', '年薪': 'income', '月薪': 'income',
     '是否体制内': 'isPublicSector', '体制内': 'isPublicSector',
@@ -65,7 +67,7 @@ def try_parse_json(text):
 
 def _convert_value(db_field, value):
     """值类型转换"""
-    if db_field in ('height', 'weight'):
+    if db_field in ('height', 'weight', 'age'):
         m = re.search(r'(\d+)', value)
         return int(m.group(1)) if m else 0
     if db_field == 'isPublicSector':

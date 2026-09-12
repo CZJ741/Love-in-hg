@@ -4,6 +4,10 @@ Component({
     filter: {
       type: Object,
       value: {}
+    },
+    membershipType: {
+      type: String,
+      value: 'free'
     }
   },
 
@@ -28,13 +32,20 @@ Component({
   },
 
   methods: {
+    isMember() {
+      const type = this.properties.membershipType;
+      return type === 'member' || type === 'vip';
+    },
+
     updateActiveCount(f) {
       let count = 0;
-      if (f.gender) count++;
+      if (f.housingLocation) count++;
       if (f.ageRange) count++;
       if (f.heightRange) count++;
+      if (f.weightRange) count++;
       if (f.isPublicSector !== undefined) count++;
       if (f.income) count++;
+      if (f.occupation) count++;
       this.setData({ activeCount: count });
     },
 
@@ -63,6 +74,24 @@ Component({
       this.triggerEvent('change', { filter: this.convertFilter(newFilter) });
     },
 
+    onMemberFilter(e) {
+      if (!this.isMember()) {
+        wx.showModal({
+          title: '会员专享',
+          content: '该筛选项为会员专享功能，请先升级会员',
+          confirmText: '去开通',
+          cancelText: '取消',
+          success: (res) => {
+            if (res.confirm) {
+              wx.switchTab({ url: '/pages/my/my' });
+            }
+          }
+        });
+        return;
+      }
+      this.onFilter(e);
+    },
+
     onReset() {
       this.setData({
         tempFilter: {},
@@ -78,21 +107,33 @@ Component({
 
     convertFilter(f) {
       const result = {};
-      if (f.gender) result.gender = f.gender;
-      if (f.income) result.income = f.income;
-      if (f.isPublicSector !== undefined) result.isPublicSector = f.isPublicSector;
-
+      // 必填项筛选（所有用户可用）
+      if (f.housingLocation) result.housingLocation = f.housingLocation;
       if (f.ageRange) {
         const [min, max] = f.ageRange.split('-').map(Number);
         result.minAge = min;
         result.maxAge = max;
       }
-      if (f.heightRange) {
-        const [min, max] = f.heightRange.split('-').map(Number);
-        result.minHeight = min;
-        result.maxHeight = max;
+
+      // 选填项筛选（仅会员生效）
+      if (this.isMember()) {
+        if (f.heightRange) {
+          const [min, max] = f.heightRange.split('-').map(Number);
+          result.minHeight = min;
+          result.maxHeight = max;
+        }
+        if (f.weightRange) {
+          const [min, max] = f.weightRange.split('-').map(Number);
+          result.minWeight = min;
+          result.maxWeight = max;
+        }
+        if (f.isPublicSector !== undefined) result.isPublicSector = f.isPublicSector;
+        if (f.income) result.income = f.income;
+        if (f.occupation) result.occupation = f.occupation;
       }
+
       return result;
     }
   }
 });
+

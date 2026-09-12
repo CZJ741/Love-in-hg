@@ -1,14 +1,22 @@
 # backend/routes/notice.py
 """启事发布 + 查看（随机分配+筛选+配额）"""
+import os
 import re
+import json
+import uuid
+import io
 from datetime import datetime, date
-from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_
+from flask import Blueprint, request, jsonify, current_app
+from sqlalchemy import func, and_, or_
+from werkzeug.utils import secure_filename
+from PIL import Image
 from models import db, User, Notice, NoticeView
 from services.quota_service import get_membership_limit, get_quota_info
 
 
 notice_bp = Blueprint('notice', __name__)
+
+
 
 
 def _mask_phone(phone):
@@ -42,22 +50,22 @@ def publish():
         return jsonify(code=400, msg='请输入姓名'), 400
     if not gender:
         return jsonify(code=400, msg='请选择性别'), 400
-    birthday = data.get('birthday', '')
-    if not birthday:
-        return jsonify(code=400, msg='请选择生日'), 400
-
-    # 生日/年龄校验：格式合法 + 不晚于今天 + 年满18周岁
+    age = data.get('age')
     try:
-        birth_date = datetime.strptime(birthday, '%Y-%m-%d').date()
+        age = int(age) if age is not None and str(age).strip() != '' else 0
     except (ValueError, TypeError):
-        return jsonify(code=400, msg='生日格式不正确'), 400
-    today = date.today()
-    if birth_date > today:
-        return jsonify(code=400, msg='生日不能晚于今天'), 400
-    # 精确计算周岁年龄（考虑月份/日期）
-    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
-    if age < 18:
-        return jsonify(code=400, msg='本平台仅面向年满18周岁的用户'), 400
+        age = 0
+
+    birthday = (data.get('birthday') or '').strip()
+    if age <= 0 and not birthday:
+        return jsonify(code=400, msg='请输入年龄'), 400
+
+    housing_location = (data.get('housingLocation') or '本地').strip()
+    if not housing_location:
+        return jsonify(code=400, msg='请选择住房位置'), 400
+
+    publisher_role = (data.get('publisherRole') or '本人').strip()
+
 
     # 查找或创建用户
     user = User.query.filter_by(phone=phone).first()
@@ -90,23 +98,40 @@ def publish():
         db.session.flush()
 
     # 一个手机号可发布多条启事，始终新增
+    images_input = data.get('images', [])
+    if isinstance(images_input, str):
+        try:
+            images_input = json.loads(images_input)
+        except Exception:
+            images_input = []
+    if not isinstance(images_input, list):
+        images_input = []
+    # 限制最多9张
+    images_input = images_input[:9]
+
     notice = Notice(
         user_id=user.id,
+        publisher_role=publisher_role,
         phone=phone,
         name=name,
         nickname=data.get('nickname', ''),
         gender=gender,
-        birthday=data.get('birthday', ''),
+        age=age,
+        birthday=birthday,
+        social_account=(data.get('socialAccount') or '').strip(),
+        housing_location=housing_location,
         occupation=data.get('occupation', ''),
         income=data.get('income', ''),
         is_public_sector=data.get('isPublicSector', False),
         height=data.get('height', 0) or 0,
         weight=data.get('weight', 0) or 0,
+        images=json.dumps(images_input, ensure_ascii=False),
         remark=data.get('remark', ''),
         source='user',
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
+
     db.session.add(notice)
     db.session.flush()
     notice_id = notice.id
@@ -127,15 +152,38 @@ def update_notice(notice_id):
         return jsonify(code=404, msg='启事不存在'), 404
 
     data = request.get_json() or {}
+    if 'publisherRole' in data:
+        notice.publisher_role = (data.get('publisherRole') or '本人').strip()
     notice.name = (data.get('name') or '').strip()
     notice.nickname = (data.get('nickname') or '').strip()
     notice.gender = data.get('gender', notice.gender)
-    notice.birthday = data.get('birthday', notice.birthday)
+    if 'age' in data:
+        try:
+            notice.age = int(data.get('age') or 0)
+        except (ValueError, TypeError):
+            pass
+    if 'birthday' in data:
+        notice.birthday = (data.get('birthday') or '').strip()
+    if 'socialAccount' in data:
+        notice.social_account = (data.get('socialAccount') or '').strip()
+    if 'housingLocation' in data:
+        notice.housing_location = (data.get('housingLocation') or '本地').strip()
     notice.occupation = data.get('occupation', '')
     notice.income = data.get('income', '')
     notice.is_public_sector = data.get('isPublicSector', False)
     notice.height = data.get('height', 0) or 0
     notice.weight = data.get('weight', 0) or 0
+
+    if 'images' in data:
+        images_input = data.get('images', [])
+        if isinstance(images_input, str):
+            try:
+                images_input = json.loads(images_input)
+            except Exception:
+                images_input = []
+        if not isinstance(images_input, list):
+            images_input = []
+        notice.images = json.dumps(images_input[:9], ensure_ascii=False)
     notice.remark = data.get('remark', '')
     notice.updated_at = datetime.utcnow()
     db.session.commit()
@@ -143,6 +191,125 @@ def update_notice(notice_id):
     return jsonify(code=0, msg='修改成功', data={
         'noticeId': str(notice.id)
     })
+
+
+def _compress_and_save_image(file_storage, dest_path, target_kb=120):
+    """
+    智能图片压缩与优化保存：
+    - 读取图片流并修正色彩模式（RGBA/P转RGB或保持RGBA）
+    - 约束最大分辨率（长边不超过1600px）
+    - 质量迭代压缩至目标大小约 120KB 左右
+    """
+    try:
+        img = Image.open(file_storage)
+
+        # 处理 EXIF 旋转（手机拍照方向修正）
+        try:
+            from PIL import ImageOps
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
+        # 限制最大宽高（例如 1600px，保持比例缩小）
+        max_dim = 1600
+        if max(img.width, img.height) > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+        # 格式判断
+        orig_ext = os.path.splitext(dest_path)[1].lower().replace('.', '')
+        # 如果是透明通道且非PNG，转RGB保存为JPEG
+        is_transparent = (img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info))
+
+        if orig_ext in ('jpg', 'jpeg') or not is_transparent:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            save_format = 'JPEG'
+        else:
+            save_format = 'PNG'
+
+        # 动态二分/循环调整 quality 逼近 target_kb (120KB)
+        target_bytes = target_kb * 1024
+        quality = 85
+        buffer = io.BytesIO()
+
+        if save_format == 'JPEG':
+            for q in [85, 75, 65, 55, 45, 35]:
+                buffer.seek(0)
+                buffer.truncate()
+                img.save(buffer, format='JPEG', quality=q, optimize=True)
+                if buffer.tell() <= target_bytes or q == 35:
+                    quality = q
+                    break
+        else:
+            # PNG 格式通过优化压缩
+            buffer.seek(0)
+            buffer.truncate()
+            img.save(buffer, format='PNG', optimize=True)
+            # 如果 PNG 还是明显超过 target_bytes，转换为高质量 JPEG
+            if buffer.tell() > target_bytes:
+                img_rgb = img.convert('RGB')
+                buffer.seek(0)
+                buffer.truncate()
+                img_rgb.save(buffer, format='JPEG', quality=80, optimize=True)
+
+        with open(dest_path, 'wb') as f:
+            f.write(buffer.getvalue())
+
+        return True
+    except Exception as e:
+        # 若压缩异常则回退至原生保存，保证上传稳定性
+        file_storage.seek(0)
+        file_storage.save(dest_path)
+        return True
+
+
+@notice_bp.route('/upload', methods=['POST'])
+def upload_image():
+    """上传图片接口，支持单张/多张图片上传并压缩至120KB左右，限制最多9张"""
+    allowed_exts = current_app.config.get('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'webp'})
+    upload_folder = current_app.config.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads'))
+    os.makedirs(upload_folder, exist_ok=True)
+
+    files = request.files.getlist('files') or request.files.getlist('images') or request.files.getlist('file') or request.files.getlist('image')
+    if not files and 'file' in request.files:
+        files = [request.files['file']]
+    elif not files and 'image' in request.files:
+        files = [request.files['image']]
+
+    if not files:
+        return jsonify(code=400, msg='请选择要上传的图片文件'), 400
+
+    if len(files) > 9:
+        return jsonify(code=400, msg='单次最多支持上传9张图片'), 400
+
+    saved_urls = []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+        if ext not in allowed_exts:
+            return jsonify(code=400, msg=f'不支持的文件类型: {ext}，仅支持 {", ".join(allowed_exts)}'), 400
+
+        # 生成唯一文件名（统一转为 jpg 便于高质量压缩）
+        out_ext = 'jpg' if ext in ('jpg', 'jpeg', 'webp', 'png') else ext
+        unique_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{out_ext}"
+        filepath = os.path.join(upload_folder, unique_name)
+
+        # 压缩并保存图片到本地 uploads 目录，目标大小约 120KB
+        _compress_and_save_image(f, filepath, target_kb=120)
+
+        file_url = f"/uploads/{unique_name}"
+        saved_urls.append(file_url)
+
+    if not saved_urls:
+        return jsonify(code=400, msg='没有有效的文件被上传'), 400
+
+    return jsonify(code=0, msg='上传成功', data={
+        'url': saved_urls[0] if len(saved_urls) == 1 else saved_urls,
+        'urls': saved_urls
+    })
+
+
 
 
 @notice_bp.route('/list', methods=['GET'])
@@ -158,16 +325,68 @@ def get_notices():
 
     today = date.today()
     period_type, period_limit = get_membership_limit(user)
+    is_member_user = user.membership_type in ('member', 'vip')
 
     # 筛选条件
+    # 必填项（所有用户开放）
     gender = request.args.get('gender')
-    min_height = request.args.get('minHeight', type=int)
-    max_height = request.args.get('maxHeight', type=int)
+    housing_location = request.args.get('housingLocation')
     min_age = request.args.get('minAge', type=int)
     max_age = request.args.get('maxAge', type=int)
-    income = request.args.get('income')
-    is_public_sector = request.args.get('isPublicSector')
-    occupation = request.args.get('occupation')
+
+    # 选填项（仅会员用户开放）
+    min_height = request.args.get('minHeight', type=int) if is_member_user else None
+    max_height = request.args.get('maxHeight', type=int) if is_member_user else None
+    min_weight = request.args.get('minWeight', type=int) if is_member_user else None
+    max_weight = request.args.get('maxWeight', type=int) if is_member_user else None
+    income = request.args.get('income') if is_member_user else None
+    is_public_sector = request.args.get('isPublicSector') if is_member_user else None
+    occupation = request.args.get('occupation') if is_member_user else None
+
+    def _apply_filters(q):
+        if gender:
+            q = q.filter(Notice.gender == gender)
+        if housing_location:
+            q = q.filter(Notice.housing_location == housing_location)
+        if min_age or max_age:
+            age_conds = []
+            if min_age and max_age:
+                age_conds.append(Notice.age.between(min_age, max_age))
+            elif min_age:
+                age_conds.append(Notice.age >= min_age)
+            elif max_age:
+                age_conds.append(Notice.age <= max_age)
+
+            # 兼容 birthday 字段（以防历史数据 age 为 0）
+            birth_conds = []
+            if min_age:
+                max_birth = f'{today.year - min_age:04d}-{today.month:02d}-{today.day:02d}'
+                birth_conds.append(Notice.birthday <= max_birth)
+            if max_age:
+                min_birth = f'{today.year - max_age:04d}-{today.month:02d}-{today.day:02d}'
+                birth_conds.append(Notice.birthday >= min_birth)
+
+            if birth_conds:
+                birth_rule = and_(*birth_conds, or_(Notice.age == None, Notice.age == 0))
+                q = q.filter(or_(*age_conds, birth_rule))
+            else:
+                q = q.filter(*age_conds)
+
+        if min_height:
+            q = q.filter(Notice.height >= min_height)
+        if max_height:
+            q = q.filter(Notice.height <= max_height)
+        if min_weight:
+            q = q.filter(Notice.weight >= min_weight)
+        if max_weight:
+            q = q.filter(Notice.weight <= max_weight)
+        if income:
+            q = q.filter(Notice.income == income)
+        if is_public_sector is not None and is_public_sector != '':
+            q = q.filter(Notice.is_public_sector == (str(is_public_sector).lower() == 'true'))
+        if occupation:
+            q = q.filter(Notice.occupation.like(f'%{occupation}%'))
+        return q
 
     # 判断当前周期是否已分配
     if period_type == 'daily':
@@ -187,24 +406,7 @@ def get_notices():
         query = Notice.query.filter(Notice.user_id != user.id)
         if all_assigned_ids:
             query = query.filter(Notice.id.notin_(all_assigned_ids))
-        if gender:
-            query = query.filter(Notice.gender == gender)
-        if min_height:
-            query = query.filter(Notice.height >= min_height)
-        if max_height:
-            query = query.filter(Notice.height <= max_height)
-        if income:
-            query = query.filter(Notice.income == income)
-        if is_public_sector is not None:
-            query = query.filter(Notice.is_public_sector == (is_public_sector.lower() == 'true'))
-        if occupation:
-            query = query.filter(Notice.occupation.like(f'%{occupation}%'))
-        if min_age:
-            max_birth = f'{today.year - min_age}-{today.month:02d}-{today.day:02d}'
-            query = query.filter(Notice.birthday <= max_birth)
-        if max_age:
-            min_birth = f'{today.year - max_age - 1}-{today.month:02d}-{today.day:02d}'
-            query = query.filter(Notice.birthday >= min_birth)
+        query = _apply_filters(query)
 
         total = query.count()
         assign_count = min(period_limit, total)
@@ -232,24 +434,7 @@ def get_notices():
         })
 
     nq = Notice.query.filter(Notice.id.in_(assigned_ids))
-    if gender:
-        nq = nq.filter(Notice.gender == gender)
-    if min_height:
-        nq = nq.filter(Notice.height >= min_height)
-    if max_height:
-        nq = nq.filter(Notice.height <= max_height)
-    if income:
-        nq = nq.filter(Notice.income == income)
-    if is_public_sector is not None:
-        nq = nq.filter(Notice.is_public_sector == (is_public_sector.lower() == 'true'))
-    if occupation:
-        nq = nq.filter(Notice.occupation.like(f'%{occupation}%'))
-    if min_age:
-        max_birth = f'{today.year - min_age}-{today.month:02d}-{today.day:02d}'
-        nq = nq.filter(Notice.birthday <= max_birth)
-    if max_age:
-        min_birth = f'{today.year - max_age - 1}-{today.month:02d}-{today.day:02d}'
-        nq = nq.filter(Notice.birthday >= min_birth)
+    nq = _apply_filters(nq)
 
     notices = nq.all()
     quota = get_quota_info(user, len(assigned_ids))
