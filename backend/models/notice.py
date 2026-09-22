@@ -14,7 +14,6 @@ class Notice(db.Model):
     nickname = db.Column(db.String(50), default='')
     gender = db.Column(db.String(2), default='')
     age = db.Column(db.Integer, default=0)
-    birthday = db.Column(db.String(10), default='')
     social_account = db.Column(db.String(100), default='')
     occupation = db.Column(db.String(50), default='')
     income = db.Column(db.String(20), default='')
@@ -50,7 +49,6 @@ class Notice(db.Model):
             'nickname': self.nickname,
             'gender': self.gender,
             'age': self.age or 0,
-            'birthday': self.birthday,
             'socialAccount': self.social_account or '',
             'housingLocation': self.housing_location or '本地',
             'occupation': self.occupation,

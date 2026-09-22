@@ -5,6 +5,11 @@ Component({
       type: Object,
       value: {}
     },
+    // 是否已登录
+    isLoggedIn: {
+      type: Boolean,
+      value: true
+    },
     // 是否显示完整手机号
     showPhone: {
       type: Boolean,
@@ -20,39 +25,53 @@ Component({
   computed: {},
 
   data: {
-    age: 0
+    age: 0,
+    showPhotoModal: false
   },
 
   observers: {
-    'notice.age, notice.birthday'(age, birthday) {
+    'notice.age'(age) {
       if (age && Number(age) > 0) {
         this.setData({ age: Number(age) });
         return;
-      }
-      if (birthday) {
-        // 尝试从生日中匹配出4位年份
-        const match = String(birthday).match(/(\d{4})/);
-        if (match) {
-          const birthYear = parseInt(match[1]);
-          const now = new Date().getFullYear();
-          if (birthYear > 1900 && birthYear <= now) {
-            this.setData({ age: now - birthYear });
-            return;
-          }
-        }
       }
       this.setData({ age: 0 });
     }
   },
 
-
   methods: {
+    stopBubble() {},
+
     onTap() {
       this.triggerEvent('tap', { notice: this.data.notice });
     },
 
+    onViewDetail() {
+      if (!this.properties.isLoggedIn) {
+        this.triggerEvent('requirelogin', { action: 'detail' });
+        return;
+      }
+      this.triggerEvent('viewdetail', { notice: this.data.notice });
+    },
+
     onShowPhone() {
+      if (!this.properties.isLoggedIn) {
+        this.triggerEvent('requirelogin', { action: 'phone' });
+        return;
+      }
       this.triggerEvent('showphone', { notice: this.data.notice });
+    },
+
+    onOpenPhotoModal() {
+      if (!this.properties.isLoggedIn) {
+        this.triggerEvent('requirelogin', { action: 'photo' });
+        return;
+      }
+      this.setData({ showPhotoModal: true });
+    },
+
+    onClosePhotoModal() {
+      this.setData({ showPhotoModal: false });
     },
 
     onPreviewPhoto(e) {

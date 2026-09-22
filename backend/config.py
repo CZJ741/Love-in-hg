@@ -41,8 +41,8 @@ class Config:
     }
 
     MEMBERSHIP_PRICES = {
-        'member': 99,
-        'vip': 999,
+        'member': 0.01,   # 普通会员 0.01 元/年
+        'vip': 0.02,      # 大会员 0.02 元/年
     }
 
     # 上传文件配置
@@ -50,9 +50,41 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
-    WX_APP_ID = os.getenv('WX_APP_ID', '')               # 小程序 AppID
-    WX_MCH_ID = os.getenv('WX_MCH_ID', '')               # 微信支付商户号
-    WX_PAY_API_KEY = os.getenv('WX_PAY_API_KEY', '')     # 商户 API 密钥 (v2 apiKey 或 v3 APIv3Key)
-    WX_PAY_NOTIFY_URL = os.getenv('WX_PAY_NOTIFY_URL', '') # 支付成功异步回调地址
-    WX_PAY_MOCK_ENABLED = os.getenv('WX_PAY_MOCK_ENABLED', 'true').lower() in ('true', '1', 'yes') # 缺少商户号时启用模拟支付/测试支付参数
+    # 项目根目录下的微信支付配置目录
+    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    PAY_CONFIG_DIR = os.path.join(ROOT_DIR, '微信支付配置')
+
+    # 解析微信支付配置.txt (作为兜底默认值)
+    _txt_config = {}
+    _config_txt_path = os.path.join(PAY_CONFIG_DIR, '微信支付配置.txt')
+    if os.path.exists(_config_txt_path):
+        try:
+            with open(_config_txt_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        _txt_config[k.strip()] = v.strip()
+        except Exception:
+            pass
+
+    # 微信小程序与微信支付配置 (优先环境变量，次选 微信支付配置.txt，再选默认值)
+    WX_APP_ID = os.getenv('WX_APP_ID', 'wx1a4d12553ae2c86b')               # 小程序 AppID
+    WX_APP_SECRET = os.getenv('WX_APP_SECRET', '67ea6ab4ddd4a33f6f757d68f7392115')                   # 小程序 AppSecret (code2session 用)
+    WX_MCH_ID = os.getenv('WX_MCH_ID', _txt_config.get('wx.merchantId', ''))
+    WX_MCH_NAME = os.getenv('WX_MCH_NAME', _txt_config.get('wx.merchantName', ''))
+    WX_API_V3_KEY = os.getenv('WX_API_V3_KEY', _txt_config.get('wx.apiV3Key', ''))
+    WX_CERT_SERIAL_NO = os.getenv('WX_CERT_SERIAL_NO', _txt_config.get('wx.merchantSerialNumber', ''))
+    WX_PUBLIC_KEY_ID = os.getenv('WX_PUBLIC_KEY_ID', _txt_config.get('wx.publicKeyId', ''))
+
+    # 私钥与公钥配置
+    WX_PRIVATE_KEY_PATH = os.getenv('WX_PRIVATE_KEY_PATH', os.path.join(PAY_CONFIG_DIR, 'apiclient_key.pem'))
+    WX_PRIVATE_KEY = os.getenv('WX_PRIVATE_KEY', _txt_config.get('wx.privateKey', ''))
+
+    WX_PUBLIC_KEY_PATH = os.getenv('WX_PUBLIC_KEY_PATH', os.path.join(PAY_CONFIG_DIR, 'pub_key.pem'))
+    WX_PUBLIC_KEY = os.getenv('WX_PUBLIC_KEY', _txt_config.get('wx.publicKey', ''))
+
+    WX_PAY_NOTIFY_URL = os.getenv('WX_PAY_NOTIFY_URL', 'https://love.yourdomain.com/api/membership/notify') # 支付成功异步回调公网地址
+    WX_PAY_MOCK_ENABLED = os.getenv('WX_PAY_MOCK_ENABLED', 'false').lower() in ('true', '1', 'yes') # 是否启用模拟支付兜底
+
 

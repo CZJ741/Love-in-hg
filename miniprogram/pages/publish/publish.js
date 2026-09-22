@@ -12,6 +12,16 @@ Page({
     this.loadMyNotices();
   },
 
+  // 预览照片
+  onPreviewPhoto(e) {
+    const current = e.currentTarget.dataset.src;
+    const urls = e.currentTarget.dataset.urls || [current];
+    wx.previewImage({
+      current,
+      urls
+    });
+  },
+
   async loadMyNotices() {
     const userId = wx.getStorageSync('userId');
     if (!userId) return;

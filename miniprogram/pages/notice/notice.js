@@ -34,28 +34,58 @@ Page({
     // 加载状态
     loading: false,
     loadingMy: false,
-    loadingHistory: false
+    loadingHistory: false,
+
+    // 详情弹窗（包含全部信息：姓名、属性、照片画廊、联系方式）
+    showDetailModal: false,
+    detailNotice: null,
+    detailLoading: false,
+
+    // 登录弹窗
+    showLoginModal: false
   },
 
   onLoad() {
-    const userInfo = wx.getStorageSync('userInfo');
-    if (userInfo) {
-      this.setData({ isLoggedIn: true });
-      this.initData();
-    }
+    this.checkLogin();
+    this.initData();
   },
 
   onShow() {
-    if (this.data.isLoggedIn && this.data.activeTab === 'mine') {
+    this.checkLogin();
+    if (this.data.activeTab === 'assigned') {
+      this.initData();
+    } else if (this.data.activeTab === 'mine' && this.data.isLoggedIn) {
       this.loadMyNotices();
-    } else if (this.data.isLoggedIn && this.data.activeTab === 'history') {
+    } else if (this.data.activeTab === 'history' && this.data.isLoggedIn) {
       this.loadHistoryNotices();
     }
   },
 
+  checkLogin() {
+    const userInfo = wx.getStorageSync('userInfo');
+    const userId = wx.getStorageSync('userId');
+    const logged = !!(userInfo && userId);
+    this.setData({ isLoggedIn: logged });
+  },
+
+  onOpenLoginModal() {
+    this.setData({ showLoginModal: true });
+  },
+
+  onCloseLoginModal() {
+    this.setData({ showLoginModal: false });
+  },
+
+  onRequireLogin(e) {
+    wx.showToast({ title: '登录后可查看启事详细信息', icon: 'none' });
+    this.setData({ showLoginModal: true });
+  },
+
   // 初始化
   async initData() {
-    await this.loadQuota();
+    if (this.data.isLoggedIn) {
+      await this.loadQuota();
+    }
     await this.loadAssignedNotices();
   },
 
@@ -147,13 +177,12 @@ Page({
     if (notice.occupation) h += 46;
     if (notice.isPublicSector) h += 46;
     if (notice.income) h += 46;
-    if (notice.birthday) h += 46;
     if (notice.weight) h += 46;
     if (notice.remark) {
       const lines = Math.ceil((notice.remark.length || 0) / 16);
       h += 30 + lines * 34;
     }
-    h += 60; // 底部：查看联系方式
+    h += 60; // 底部：查看详情按钮
     return h;
   },
 
@@ -208,7 +237,10 @@ Page({
           const u = res.data.user;
           wx.setStorageSync('userInfo', u);
           wx.setStorageSync('userId', String(u.id));
-          this.setData({ isLoggedIn: true });
+          this.setData({
+            isLoggedIn: true,
+            showLoginModal: false
+          });
           this.initData();
           wx.showToast({ title: '登录成功', icon: 'success' });
         }
@@ -236,24 +268,90 @@ Page({
     }
   },
 
-  // 查看完整手机号（列表返回的是脱敏号，需按需获取）
-  async onShowPhone(e) {
-    const { notice } = e.detail;
-    try {
-      const res = await api.viewNoticePhone(notice.id);
-      if (res.code === 0) {
-        wx.showModal({
-          title: '联系方式',
-          content: `手机号码：${res.data.phone}\n姓名：${res.data.name}`,
-          showCancel: false,
-          confirmText: '知道了'
-        });
-      } else {
-        wx.showToast({ title: res.msg || '获取联系方式失败', icon: 'none' });
-      }
-    } catch (err) {
-      wx.showToast({ title: '获取联系方式失败，请重试', icon: 'none' });
+  // 点击查看详情（全量信息弹窗：包含照片相册与按需获取联系方式）
+  async onViewDetail(e) {
+    const notice = e.detail && e.detail.notice;
+    if (!notice) return;
+
+    if (!this.data.isLoggedIn) {
+      wx.showToast({ title: '登录后可查看启事详细信息', icon: 'none' });
+      this.setData({ showLoginModal: true });
+      return;
     }
+
+    // 初始化详情数据并展示弹窗
+    this.setData({
+      detailNotice: {
+        ...notice,
+        fullPhone: notice.phone && !notice.phone.includes('*') ? notice.phone : '',
+        unlockedContact: !!(notice.phone && !notice.phone.includes('*'))
+      },
+      showDetailModal: true
+    });
+
+    // 如果未解锁联系方式（是脱敏号且不是本人启事），调用接口按需获取真实联系方式
+    if (notice.phone && notice.phone.includes('*')) {
+      try {
+        const res = await api.viewNoticePhone(notice.id);
+        if (res.code === 0) {
+          this.setData({
+            'detailNotice.fullPhone': res.data.phone,
+            'detailNotice.socialAccount': res.data.socialAccount || notice.socialAccount || '',
+            'detailNotice.name': res.data.name || notice.name,
+            'detailNotice.unlockedContact': true
+          });
+        }
+      } catch (err) {
+        console.warn('获取联系方式失败:', err);
+      }
+    }
+  },
+
+  onCloseDetailModal() {
+    this.setData({
+      showDetailModal: false,
+      detailNotice: null
+    });
+  },
+
+  // 预览照片
+  onPreviewPhoto(e) {
+    const current = e.currentTarget.dataset.src;
+    const urls = (this.data.detailNotice && this.data.detailNotice.images) || [];
+    wx.previewImage({
+      current,
+      urls
+    });
+  },
+
+  onCopyDetailPhone() {
+    const phone = this.data.detailNotice && this.data.detailNotice.fullPhone;
+    if (!phone) return;
+    wx.setClipboardData({
+      data: phone,
+      success: () => {
+        wx.showToast({ title: '电话已复制', icon: 'success' });
+      }
+    });
+  },
+
+  onCopyDetailSocial() {
+    const social = this.data.detailNotice && this.data.detailNotice.socialAccount;
+    if (!social) return;
+    wx.setClipboardData({
+      data: social,
+      success: () => {
+        wx.showToast({ title: '社交账号已复制', icon: 'success' });
+      }
+    });
+  },
+
+  onCallDetailPhone() {
+    const phone = this.data.detailNotice && this.data.detailNotice.fullPhone;
+    if (!phone) return;
+    wx.makePhoneCall({
+      phoneNumber: phone
+    });
   },
 
   onGoPublish() {
@@ -262,5 +360,19 @@ Page({
 
   onGoMy() {
     wx.switchTab({ url: '/pages/my/my' });
+  },
+
+  // 下拉刷新
+  async onPullDownRefresh() {
+    if (this.data.isLoggedIn) {
+      if (this.data.activeTab === 'assigned') {
+        await this.initData();
+      } else if (this.data.activeTab === 'mine') {
+        await this.loadMyNotices();
+      } else if (this.data.activeTab === 'history') {
+        await this.loadHistoryNotices();
+      }
+    }
+    wx.stopPullDownRefresh();
   }
 });

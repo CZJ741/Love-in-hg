@@ -13,7 +13,7 @@ Page({
     remaining: 0,
     quotaLimit: 10,
     periodLabel: '本月配额',
-    prices: { member: 99, vip: 999 },
+    prices: { member: 0.01, vip: 0.02 },
     showLoginModal: false,
     loginPhone: ''
   },
@@ -41,12 +41,18 @@ Page({
         const memberNames = { free: '普通用户', member: '会员', vip: '大会员' };
         const isDaily = quota.periodType === 'daily';
 
+        let expireStr = user.membershipExpire || '';
+        if (expireStr) {
+          // 处理形如 '2026-10-16T12:30:00' 或 '2026-10-16 12:30:00'，只保留日期部分 YYYY-MM-DD
+          expireStr = expireStr.split('T')[0].split(' ')[0];
+        }
+
         this.setData({
           user,
           userInitial: (user.name || '?')[0],
           membershipType: quota.membershipType,
           membershipName: memberNames[quota.membershipType] || '普通用户',
-          membershipExpire: user.membershipExpire || '',
+          membershipExpire: expireStr,
           noticeCount: user.noticeCount || 0,
           monthlyAssigned: quota.monthlyAssigned,
           remaining: Math.max(0, remaining),
@@ -149,15 +155,29 @@ Page({
 
     wx.showModal({
       title: `开通${name}`,
-      content: `确认支付 ${price} 元开通${name}服务？（享有配额：${quotaDesc}）`,
+      content: `确认支付 ${price} 元开通${name}服务（有效期1年，享有配额：${quotaDesc}）？`,
       success: async (modalRes) => {
         if (!modalRes.confirm) return;
 
         wx.showLoading({ title: '正在发起支付...', mask: true });
 
         try {
+          // 获取最新的微信登录 code，以便后端获取或绑定 openid
+          let wxCode = '';
+          try {
+            const loginRes = await new Promise((resolve, reject) => {
+              wx.login({
+                success: resolve,
+                fail: reject
+              });
+            });
+            wxCode = loginRes.code || '';
+          } catch (codeErr) {
+            console.warn('获取 wx.login code 失败:', codeErr);
+          }
+
           // 1. 创建订单并统一下单
-          const res = await api.purchaseMembership(type);
+          const res = await api.purchaseMembership(type, { code: wxCode });
           wx.hideLoading();
 
           if (res.code !== 0 || !res.data) {
@@ -168,11 +188,11 @@ Page({
           const orderData = res.data;
           const { orderId, orderNo, payment, isMock } = orderData;
 
-          // 2. 判断是否为未配置商户号的模拟支付测试模式
+          // 2. 判断是否为开发环境模拟支付测试模式
           if (isMock) {
             wx.showModal({
               title: '支付测试环境',
-              content: `已生成订单（单号: ${orderNo}），当前未绑定微信商户号，是否模拟支付完成？`,
+              content: `已生成订单（单号: ${orderNo}），当前为测试支付模式，是否模拟支付完成？`,
               confirmText: '模拟支付',
               cancelText: '取消',
               success: async (mockModal) => {
@@ -201,11 +221,19 @@ Page({
           try {
             await api.requestPayment(payment);
 
-            // 支付成功提示并主动刷新用户配置
+            // 支付完成后主动查询一次状态并刷新用户资料
+            wx.showLoading({ title: '正在确认支付结果...', mask: true });
+            try {
+              await api.getOrderStatus(orderId, orderNo);
+            } catch (statusErr) {
+              console.warn('查询订单状态失败:', statusErr);
+            }
+            wx.hideLoading();
+
             wx.showToast({ title: '支付成功', icon: 'success' });
             setTimeout(() => {
               this.loadUserProfile();
-            }, 1000);
+            }, 800);
           } catch (payErr) {
             // 用户取消支付或支付失败
             if (payErr.errMsg && payErr.errMsg.includes('cancel')) {

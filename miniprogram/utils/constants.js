@@ -40,7 +40,6 @@ const FIELD_LABELS = {
   nickname: '昵称',
   gender: '性别',
   age: '年龄',
-  birthday: '生日',
   socialAccount: '社交账号',
   occupation: '职业',
   income: '收入',

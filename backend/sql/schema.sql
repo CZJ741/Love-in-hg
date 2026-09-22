@@ -51,7 +51,6 @@ CREATE TABLE IF NOT EXISTS notices (
     nickname        VARCHAR(50)  DEFAULT '' COMMENT '昵称',
     gender          VARCHAR(2)   DEFAULT '' COMMENT '性别',
     age             INT          DEFAULT 0  COMMENT '年龄',
-    birthday        VARCHAR(20)  DEFAULT '' COMMENT '生日',
     social_account  VARCHAR(100) DEFAULT '' COMMENT '社交账号',
     housing_location VARCHAR(20) DEFAULT '本地' COMMENT '住房位置(本地/外地)',
     occupation      VARCHAR(50)  DEFAULT '' COMMENT '职业',

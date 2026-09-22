@@ -30,6 +30,7 @@ def get_profile():
 
     # 当前周期已分配启事数
     period_type, period_limit = get_membership_limit(user)
+    db.session.commit()
     now = datetime.utcnow()
     if period_type == 'daily':
         period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)

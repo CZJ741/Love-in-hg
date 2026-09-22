@@ -2,7 +2,7 @@
 // Python 后端 REST API 调用封装
 
 const BASE_URL = 'http://127.0.0.1:5000/api';  // 生产环境服务器地址
-//const BASE_URL = 'https://aibao.love/api';  // 生产环境服务器地址
+// const BASE_URL = 'https://aibao.love/api';  // 本地开发调试地址
 /**
  * 通用请求方法
  */
@@ -125,8 +125,16 @@ function getUserProfile() {
 /**
  * 购买会员（创建订单并统一下单获取支付参数）
  */
-function purchaseMembership(type) {
-  return post('/membership/purchase', { type });
+function purchaseMembership(type, extra = {}) {
+  return post('/membership/purchase', { type, ...extra });
+}
+
+/**
+ * 微信静默登录获取 openid
+ */
+function wxLogin(code) {
+  const userId = wx.getStorageSync('userId') || '';
+  return post('/auth/wx-login', { code, userId });
 }
 
 /**
@@ -252,6 +260,7 @@ module.exports = {
   getNoticeHistory,
   viewNoticePhone,
   getUserProfile,
+  wxLogin,
   purchaseMembership,
   getOrderStatus,
   mockPaySuccess,

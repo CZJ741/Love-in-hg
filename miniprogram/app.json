@@ -21,19 +21,19 @@
     "list": [
       {
         "pagePath": "pages/notice/notice",
-        "text": "启事",
+        "text": "婚恋信息",
         "iconPath": "images/notice.png",
         "selectedIconPath": "images/notice-active.png"
       },
       {
         "pagePath": "pages/publish/publish",
-        "text": "发布",
+        "text": "我的发布",
         "iconPath": "images/publish.png",
         "selectedIconPath": "images/publish-active.png"
       },
       {
         "pagePath": "pages/my/my",
-        "text": "我的",
+        "text": "会员中心",
         "iconPath": "images/my.png",
         "selectedIconPath": "images/my-active.png"
       }

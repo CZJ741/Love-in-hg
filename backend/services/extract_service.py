@@ -9,7 +9,7 @@ FIELD_MAP = {
     '昵称': 'nickname',
     '性别': 'gender',
     '年龄': 'age',
-    '生日': 'birthday', '出生日期': 'birthday',
+    '生日': 'age', '出生日期': 'age', '出生年份': 'age',
     '社交账号': 'socialAccount', '微信号': 'socialAccount', '微信': 'socialAccount', 'QQ': 'socialAccount', 'qq': 'socialAccount',
     '职业': 'occupation', '工作': 'occupation',
     '收入': 'income', '年薪': 'income', '月薪': 'income',
@@ -67,11 +67,20 @@ def try_parse_json(text):
 
 def _convert_value(db_field, value):
     """值类型转换"""
-    if db_field in ('height', 'weight', 'age'):
+    if db_field in ('height', 'weight'):
         m = re.search(r'(\d+)', value)
         return int(m.group(1)) if m else 0
+    if db_field == 'age':
+        m = re.search(r'(\d+)', value)
+        if not m:
+            return 0
+        num = int(m.group(1))
+        # 若提取到的是年份（如 1995），自动换算为年龄
+        import datetime
+        cur_year = datetime.datetime.now().year
+        if 1900 < num <= cur_year:
+            return cur_year - num
+        return num
     if db_field == 'isPublicSector':
         return value in ('是', '✅', '✔', 'true', 'True')
-    if db_field == 'birthday':
-        return re.sub(r'[年月]', '-', value).rstrip('日')
     return value

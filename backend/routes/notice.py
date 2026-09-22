@@ -56,9 +56,14 @@ def publish():
     except (ValueError, TypeError):
         age = 0
 
-    birthday = (data.get('birthday') or '').strip()
-    if age <= 0 and not birthday:
-        return jsonify(code=400, msg='请输入年龄'), 400
+    if age <= 0:
+        birthday = (data.get('birthday') or '').strip()
+        if birthday:
+            match = re.search(r'(\d{4})', birthday)
+            if match:
+                age = datetime.now().year - int(match.group(1))
+    if age <= 0:
+        return jsonify(code=400, msg='请输入有效年龄'), 400
 
     housing_location = (data.get('housingLocation') or '本地').strip()
     if not housing_location:
@@ -72,7 +77,6 @@ def publish():
     if user:
         user.name = name
         user.gender = gender
-        user.birthday = data.get('birthday', '')
         user.occupation = data.get('occupation', '')
         user.income = data.get('income', '')
         user.is_public_sector = data.get('isPublicSector', False)
@@ -84,7 +88,6 @@ def publish():
             phone=phone,
             name=name,
             gender=gender,
-            birthday=data.get('birthday', ''),
             occupation=data.get('occupation', ''),
             income=data.get('income', ''),
             is_public_sector=data.get('isPublicSector', False),
@@ -117,7 +120,6 @@ def publish():
         nickname=data.get('nickname', ''),
         gender=gender,
         age=age,
-        birthday=birthday,
         social_account=(data.get('socialAccount') or '').strip(),
         housing_location=housing_location,
         occupation=data.get('occupation', ''),
@@ -162,8 +164,11 @@ def update_notice(notice_id):
             notice.age = int(data.get('age') or 0)
         except (ValueError, TypeError):
             pass
-    if 'birthday' in data:
-        notice.birthday = (data.get('birthday') or '').strip()
+    elif 'birthday' in data:
+        b_str = (data.get('birthday') or '').strip()
+        m = re.search(r'(\d{4})', b_str)
+        if m:
+            notice.age = datetime.now().year - int(m.group(1))
     if 'socialAccount' in data:
         notice.social_account = (data.get('socialAccount') or '').strip()
     if 'housingLocation' in data:
@@ -314,27 +319,17 @@ def upload_image():
 
 @notice_bp.route('/list', methods=['GET'])
 def get_notices():
-    """启事分配：free/member每月1号分配，vip每天分配，分配后可反复查看"""
+    """启事分配：free/member每月1号分配，vip每天分配，未登录展示公开推荐"""
     user_id = request.args.get('userId') or request.headers.get('X-User-Id')
-    if not user_id:
-        return jsonify(code=401, msg='请先登录'), 401
-
-    user = User.query.get(int(user_id))
-    if not user:
-        return jsonify(code=401, msg='用户不存在'), 401
-
-    today = date.today()
-    period_type, period_limit = get_membership_limit(user)
-    is_member_user = user.membership_type in ('member', 'vip')
+    user = User.query.get(int(user_id)) if user_id and str(user_id).isdigit() else None
 
     # 筛选条件
-    # 必填项（所有用户开放）
     gender = request.args.get('gender')
     housing_location = request.args.get('housingLocation')
     min_age = request.args.get('minAge', type=int)
     max_age = request.args.get('maxAge', type=int)
 
-    # 选填项（仅会员用户开放）
+    is_member_user = user and user.membership_type in ('member', 'vip')
     min_height = request.args.get('minHeight', type=int) if is_member_user else None
     max_height = request.args.get('maxHeight', type=int) if is_member_user else None
     min_weight = request.args.get('minWeight', type=int) if is_member_user else None
@@ -349,28 +344,12 @@ def get_notices():
         if housing_location:
             q = q.filter(Notice.housing_location == housing_location)
         if min_age or max_age:
-            age_conds = []
             if min_age and max_age:
-                age_conds.append(Notice.age.between(min_age, max_age))
+                q = q.filter(Notice.age.between(min_age, max_age))
             elif min_age:
-                age_conds.append(Notice.age >= min_age)
+                q = q.filter(Notice.age >= min_age)
             elif max_age:
-                age_conds.append(Notice.age <= max_age)
-
-            # 兼容 birthday 字段（以防历史数据 age 为 0）
-            birth_conds = []
-            if min_age:
-                max_birth = f'{today.year - min_age:04d}-{today.month:02d}-{today.day:02d}'
-                birth_conds.append(Notice.birthday <= max_birth)
-            if max_age:
-                min_birth = f'{today.year - max_age:04d}-{today.month:02d}-{today.day:02d}'
-                birth_conds.append(Notice.birthday >= min_birth)
-
-            if birth_conds:
-                birth_rule = and_(*birth_conds, or_(Notice.age == None, Notice.age == 0))
-                q = q.filter(or_(*age_conds, birth_rule))
-            else:
-                q = q.filter(*age_conds)
+                q = q.filter(Notice.age <= max_age)
 
         if min_height:
             q = q.filter(Notice.height >= min_height)
@@ -388,19 +367,45 @@ def get_notices():
             q = q.filter(Notice.occupation.like(f'%{occupation}%'))
         return q
 
+    # 1. 未登录访客逻辑：直接返回最新的公开启事列表供浏览
+    if not user:
+        nq = Notice.query.order_by(Notice.created_at.desc())
+        nq = _apply_filters(nq)
+        notices = nq.limit(20).all()
+        notice_list = [n.to_dict() for n in notices]
+        for item in notice_list:
+            item['phone'] = _mask_phone(item['phone'])
+        return jsonify(code=0, data={
+            'notices': notice_list,
+            'remaining': 0,
+            'membershipType': 'free',
+            'periodType': 'monthly',
+            'limitReached': False
+        })
+
+    # 2. 已登录用户逻辑：按配额分配与查看
+    today = date.today()
+    period_type, period_limit = get_membership_limit(user)
+    db.session.commit()
+
     # 判断当前周期是否已分配
     if period_type == 'daily':
         period_start = datetime(today.year, today.month, today.day)
     else:
         period_start = datetime(today.year, today.month, 1)
 
-    period_view_count = NoticeView.query.filter(
+    # 1. 检查当前周期已分配的启事数量
+    assigned_views = NoticeView.query.filter(
         NoticeView.user_id == user.id,
         NoticeView.viewed_at >= period_start
-    ).count()
+    ).all()
+    assigned_ids = [v.notice_id for v in assigned_views]
+    assigned_count = len(assigned_ids)
 
-    if period_view_count == 0:
-        # 新周期：随机分配启事，排除历史上已分配过的
+    # 2. 如果已分配数量小于当前会员等级对应的周期额度（如升级了会员，或者新周期尚未分配），补充分配差额
+    needed_count = period_limit - assigned_count
+    if needed_count > 0:
+        # 排除历史上所有已为该用户分配过的启事
         all_assigned_ids = [v.notice_id for v in NoticeView.query.filter_by(user_id=user.id).all()]
 
         query = Notice.query.filter(Notice.user_id != user.id)
@@ -408,21 +413,15 @@ def get_notices():
             query = query.filter(Notice.id.notin_(all_assigned_ids))
         query = _apply_filters(query)
 
-        total = query.count()
-        assign_count = min(period_limit, total)
+        total_available = query.count()
+        assign_count = min(needed_count, total_available)
 
         if assign_count > 0:
             assign_ids = [row[0] for row in query.with_entities(Notice.id).order_by(func.rand()).limit(assign_count).all()]
             for nid in assign_ids:
                 db.session.add(NoticeView(user_id=user.id, notice_id=nid, viewed_at=datetime.utcnow()))
             db.session.commit()
-
-    # 查询当前周期已分配的启事
-    assigned_views = NoticeView.query.filter(
-        NoticeView.user_id == user.id,
-        NoticeView.viewed_at >= period_start
-    ).all()
-    assigned_ids = [v.notice_id for v in assigned_views]
+            assigned_ids.extend(assign_ids)
 
     if not assigned_ids:
         return jsonify(code=0, data={
@@ -508,7 +507,8 @@ def view_phone():
     return jsonify(code=0, data={
         'noticeId': str(notice.id),
         'name': notice.name,
-        'phone': notice.phone
+        'phone': notice.phone,
+        'socialAccount': notice.social_account or ''
     })
 
 

@@ -1,73 +1,102 @@
 <!-- components/notice-card/notice-card.wxml -->
-<view class="notice-card card {{notice.gender === '男' ? 'gender-male' : 'gender-female'}}" bindtap="onTap">
-  <view class="card-header flex-between">
-    <view class="flex-row">
-      <text class="name">{{notice.name}}</text>
-      <text class="gender {{notice.gender === '男' ? 'male' : 'female'}}">{{notice.gender}}</text>
-      <text class="age" wx:if="{{age}}">{{age}}岁</text>
-    </view>
-    <view class="header-tags">
-      <text class="location-badge" wx:if="{{notice.housingLocation}}">{{notice.housingLocation}}房</text>
-      <text class="height" wx:if="{{notice.height}}">{{notice.height}}cm</text>
-    </view>
-  </view>
-  <view class="card-body">
-    <view class="info-row" wx:if="{{notice.publisherRole && notice.publisherRole !== '本人'}}">
-      <text class="label">发布人</text>
-      <text class="value">{{notice.publisherRole}}</text>
-    </view>
-    <view class="info-row" wx:if="{{notice.housingLocation}}">
-      <text class="label">住房</text>
-      <text class="value">{{notice.housingLocation}}</text>
-    </view>
-    <view class="info-row" wx:if="{{notice.occupation}}">
+<view class="notice-card {{notice.gender === '男' ? 'gender-male' : 'gender-female'}}">
+  <!-- 顶部彩色氛围光晕与高光条 -->
+  <view class="card-accent-bar"></view>
 
-      <text class="label">职业</text>
-      <text class="value">{{notice.occupation}}</text>
+  <!-- 头部区域：姓名 + 身份徽章 -->
+  <view class="card-head">
+    <view class="head-user">
+      <!-- 姓名：未登录做高斯模糊处理 -->
+      <view class="name-box {{!isLoggedIn ? 'blur-content' : ''}}">
+        <text class="user-name">{{notice.name}}</text>
+      </view>
+      <!-- 性别与年龄精致组合标 -->
+      <view class="gender-age-tag {{notice.gender === '男' ? 'tag-male' : 'tag-female'}}">
+        <text class="gender-icon">{{notice.gender === '男' ? '♂' : '♀'}}</text>
+        <text class="age-text" wx:if="{{age}}">{{age}}岁</text>
+        <text class="gender-text" wx:else>{{notice.gender}}</text>
+      </view>
     </view>
-    <view class="info-row sector-row" wx:if="{{notice.isPublicSector}}">
-      <text class="label">体制内</text>
-      <text class="value"><text class="sector-badge">是</text></text>
-    </view>
-    <view class="info-row" wx:if="{{notice.income}}">
-      <text class="label">收入</text>
-      <text class="value">{{notice.income}}</text>
-    </view>
-    <view class="info-row" wx:if="{{notice.birthday}}">
-      <text class="label">生日</text>
-      <text class="value">{{notice.birthday}}</text>
-    </view>
-    <view class="info-row" wx:if="{{notice.socialAccount}}">
-      <text class="label">社交账号</text>
-      <text class="value">{{notice.socialAccount}}</text>
-    </view>
-    <view class="info-row" wx:if="{{notice.weight}}">
-      <text class="label">体重</text>
-      <text class="value">{{notice.weight}}kg</text>
+    <view class="head-badges" wx:if="{{notice.publisherRole && notice.publisherRole !== '本人'}}">
+      <text class="role-badge">{{notice.publisherRole}}发布</text>
     </view>
   </view>
-  <view class="card-footer" wx:if="{{showPhone}}">
-    <text class="phone">{{notice.phone}}</text>
-  </view>
-  <view class="card-footer phone-action" wx:if="{{!showPhone && !hidePhoneAction}}">
-    <text class="phone-hint" catchtap="onShowPhone">点击查看联系方式</text>
-  </view>
-  <view class="card-remark" wx:if="{{notice.remark}}">
-    <text class="remark-label">备注</text>
-    <text class="remark-text">{{notice.remark}}</text>
-  </view>
-  <view class="card-photos" wx:if="{{notice.images && notice.images.length > 0}}">
-    <view class="photos-grid">
-      <image
-        wx:for="{{notice.images}}"
-        wx:key="*this"
-        class="photo-thumb"
-        src="{{item}}"
-        mode="aspectFill"
-        catchtap="onPreviewPhoto"
-        data-src="{{item}}"
-      />
+
+  <!-- 核心数据单行规范排列表 -->
+  <view class="card-info-list">
+    <!-- 性别 -->
+    <view class="info-cell">
+      <text class="cell-label">性别</text>
+      <text class="cell-val">{{notice.gender}}</text>
     </view>
+
+    <!-- 年龄 -->
+    <view class="info-cell" wx:if="{{age}}">
+      <text class="cell-label">年龄</text>
+      <text class="cell-val font-num">{{age}} 岁</text>
+    </view>
+
+    <!-- 住房 -->
+    <view class="info-cell" wx:if="{{notice.housingLocation}}">
+      <text class="cell-label">住房</text>
+      <view class="cell-val flex-val">
+        <text class="location-pill">{{notice.housingLocation}}房</text>
+      </view>
+    </view>
+
+    <!-- 身高 -->
+    <view class="info-cell" wx:if="{{notice.height}}">
+      <text class="cell-label">身高</text>
+      <text class="cell-val font-num">{{notice.height}} cm</text>
+    </view>
+
+    <!-- 体重 -->
+    <view class="info-cell" wx:if="{{notice.weight}}">
+      <text class="cell-label">体重</text>
+      <text class="cell-val font-num">{{notice.weight}} kg</text>
+    </view>
+
+    <!-- 职业 -->
+    <view class="info-cell" wx:if="{{notice.occupation}}">
+      <text class="cell-label">职业</text>
+      <text class="cell-val">{{notice.occupation}}</text>
+    </view>
+
+    <!-- 体制内 -->
+    <view class="info-cell" wx:if="{{notice.isPublicSector}}">
+      <text class="cell-label">体制内</text>
+      <view class="cell-val">
+        <text class="sector-pill">✓ 体制内单位</text>
+      </view>
+    </view>
+
+    <!-- 收入 -->
+    <view class="info-cell" wx:if="{{notice.income}}">
+      <text class="cell-label">收入</text>
+      <text class="cell-val font-highlight">{{notice.income}}</text>
+    </view>
+  </view>
+
+  <!-- 个人备注与择偶要求 -->
+  <view class="card-quote" wx:if="{{notice.remark}}">
+    <view class="quote-header">
+      <text class="quote-icon">❝</text>
+      <text class="quote-title">个人心语 · 择偶要求</text>
+    </view>
+    <text class="quote-text">{{notice.remark}}</text>
+  </view>
+
+  <!-- 底部联系方式展示（我的启事明文显示） -->
+  <view class="card-footer-phone" wx:if="{{showPhone}}">
+    <text class="phone-tag">联系电话</text>
+    <text class="phone-number">{{notice.phone}}</text>
+  </view>
+
+  <!-- 底部操作按钮栏：仅放置一个查看详情按钮 -->
+  <view class="card-footer-action">
+    <button class="btn-action-pill btn-view-detail" catchtap="onViewDetail">
+      <text class="action-icon">📋</text>
+      <text>查看详情</text>
+    </button>
   </view>
 </view>
-

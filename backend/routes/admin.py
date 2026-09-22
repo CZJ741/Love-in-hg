@@ -37,14 +37,21 @@ def extract_and_import():
             return jsonify(code=409, msg=f'手机号 {extracted["phone"]} 已存在', extracted=extracted), 409
 
     # 入库
+    age_val = int(extracted.get('age', 0) or 0)
+    if age_val <= 0 and extracted.get('birthday'):
+        import re
+        match = re.search(r'(\d{4})', str(extracted.get('birthday')))
+        if match:
+            age_val = datetime.now().year - int(match.group(1))
+
     notice = Notice(
         user_id=0,
         phone=extracted.get('phone', ''),
         name=extracted.get('name', ''),
         nickname=extracted.get('nickname', ''),
         gender=extracted.get('gender', ''),
-        age=int(extracted.get('age', 0) or 0),
-        birthday=extracted.get('birthday', ''),
+        age=age_val,
+        birthday='',
         social_account=extracted.get('socialAccount', ''),
         occupation=extracted.get('occupation', ''),
         income=extracted.get('income', ''),
@@ -94,14 +101,20 @@ def init_data():
                 skip += 1
                 continue
 
+            age_val = int(item.get('age', 0) or 0)
+            if age_val <= 0 and item.get('birthday'):
+                import re
+                match = re.search(r'(\d{4})', str(item.get('birthday')))
+                if match:
+                    age_val = datetime.now().year - int(match.group(1))
+
             notice = Notice(
                 user_id=0,
                 phone=item.get('phone', ''),
                 name=item.get('name', ''),
                 nickname=item.get('nickname', ''),
                 gender=item.get('gender', ''),
-                age=int(item.get('age', 0) or 0),
-                birthday=item.get('birthday', ''),
+                age=age_val,
                 social_account=item.get('socialAccount', '') or item.get('social_account', ''),
                 occupation=item.get('occupation', ''),
                 income=item.get('income', ''),

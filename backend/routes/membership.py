@@ -1,13 +1,17 @@
 # backend/routes/membership.py
 """会员购买与支付相关接口"""
-import time
-import uuid
+import logging
 import random
 import string
+import time
+import uuid
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from models import db, User, MembershipOrder
 from config import Config
+from utils.wechat_pay import wechat_pay
+
+logger = logging.getLogger(__name__)
 
 membership_bp = Blueprint('membership', __name__)
 
@@ -20,11 +24,11 @@ def generate_order_no():
 
 
 def grant_membership_to_user(user, member_type):
-    """发放会员权益与到期时间（默认 30 天，已是会员则在原有有效期顺延）"""
+    """发放会员权益与到期时间（年费会员，开通/续费均为 365 天/1 年，已是有效会员则在原有有效期顺延）"""
     now = datetime.utcnow()
     base_time = user.membership_expire if (user.membership_expire and user.membership_expire > now) else now
-    # 会员与大会员购买均默认生效 30 天
-    user.membership_expire = base_time + timedelta(days=30)
+    # 会员与大会员均为年费，购买生效 365 天（1年）
+    user.membership_expire = base_time + timedelta(days=365)
     user.membership_type = member_type
     user.updated_at = now
 
@@ -33,12 +37,15 @@ def grant_membership_to_user(user, member_type):
 def purchase():
     """
     创建会员订单并统一下单
-    返回前端调起微信支付 wx.requestPayment 所需全部参数
-    若未配置真实商户号，则返回模拟支付参数，前端与后端可联动测试
+    支持：
+    1. 真实微信支付 V3 JSAPI 统一下单 (若已配置商户参数)
+    2. 模拟支付参数回退 (未配置商户参数或开启 WX_PAY_MOCK_ENABLED 时的测试)
     """
     data = request.get_json() or {}
     member_type = data.get('type', '').strip()
     user_id = data.get('userId') or request.headers.get('X-User-Id')
+    code = data.get('code', '').strip()          # 小程序 wx.login 传入的临时 code
+    openid = data.get('openid', '').strip()      # 可选：前端直接传入已缓存的 openid
 
     if member_type not in Config.MEMBERSHIP_PRICES:
         return jsonify(code=400, msg='无效的会员类型'), 400
@@ -52,6 +59,18 @@ def purchase():
 
     if not user:
         return jsonify(code=401, msg='用户不存在'), 401
+
+    # 优先使用用户已绑定的 openid，次选前端传参，再次选通过 code 换取
+    target_openid = user.openid or openid
+    if not target_openid and code:
+        try:
+            session_info = wechat_pay.code2session(code)
+            target_openid = session_info.get('openid', '')
+            if target_openid:
+                user.openid = target_openid
+                db.session.commit()
+        except Exception as e:
+            logger.warning(f"通过 code 换取 openid 失败: {e}")
 
     amount = Config.MEMBERSHIP_PRICES[member_type]
     order_no = generate_order_no()
@@ -68,34 +87,58 @@ def purchase():
     db.session.commit()
 
     type_labels = {'member': '会员', 'vip': '大会员'}
+    desc = f"开通{type_labels.get(member_type, '会员')}"
 
-    # 微信统一下单参数构建
-    # 若已配置真实微信商户信息，需请求微信统一下单接口（如 WeChat Pay v3 /v3/pay/transactions/jsapi）
-    # 在未配置商户号时，提供模拟/占位参数，方便前端完整链路联调
-    has_real_mch = bool(Config.WX_MCH_ID and Config.WX_PAY_API_KEY)
+    # 判断是否使用真实微信支付 V3
+    use_real_pay = wechat_pay.is_configured() and bool(target_openid)
 
-    timestamp = str(int(time.time()))
-    nonce_str = uuid.uuid4().hex[:32]
+    if use_real_pay:
+        try:
+            # 微信支付金额单位为「分」，且必须为整数，故四舍五入避免 0.01*100 浮点误差
+            total_cents = int(round(amount * 100))
+            res_order = wechat_pay.jsapi_order(
+                out_trade_no=order.order_no,
+                total_amount_cents=total_cents,
+                description=desc,
+                openid=target_openid
+            )
+            prepay_id = res_order.get('prepay_id')
+            if not prepay_id:
+                raise Exception(f"微信返回无 prepay_id: {res_order}")
 
-    if has_real_mch:
-        # TODO: 接入真实微信支付统一下单 API
-        # 1. 向 https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi 发送请求
-        # 2. 获取 prepay_id
-        # 3. 使用商户私钥对 (appId, timeStamp, nonceStr, prepay_id) 生成 paySign
-        prepay_id = f"wx{timestamp}"
-        pay_sign = "placeholder_real_pay_sign"
+            payment_params = wechat_pay.build_miniprogram_payment_params(prepay_id)
+            is_mock = False
+        except Exception as e:
+            logger.error(f"微信支付统一下单异常: {e}")
+            if Config.WX_PAY_MOCK_ENABLED:
+                logger.info("微信统一下单失败，降级为 Mock 支付")
+                timestamp = str(int(time.time()))
+                payment_params = {
+                    'timeStamp': timestamp,
+                    'nonceStr': uuid.uuid4().hex[:32],
+                    'package': f"prepay_id=mock_prepay_{order.id}_{timestamp}",
+                    'signType': 'RSA',
+                    'paySign': 'mock_pay_sign'
+                }
+                is_mock = True
+            else:
+                return jsonify(code=500, msg=f"微信支付下单失败: {str(e)}"), 500
     else:
-        # 开发/模拟阶段占位参数
-        prepay_id = f"mock_prepay_{order.id}_{timestamp}"
-        pay_sign = "mock_pay_sign"
+        if wechat_pay.is_configured() and not target_openid:
+            # 商户已配置但缺少 openid
+            if not Config.WX_PAY_MOCK_ENABLED:
+                return jsonify(code=400, msg="缺少用户微信 openid，请先通过微信登录授权"), 400
 
-    payment_params = {
-        'timeStamp': timestamp,
-        'nonceStr': nonce_str,
-        'package': f"prepay_id={prepay_id}",
-        'signType': 'RSA',
-        'paySign': pay_sign
-    }
+        # Mock 模式兜底
+        timestamp = str(int(time.time()))
+        payment_params = {
+            'timeStamp': timestamp,
+            'nonceStr': uuid.uuid4().hex[:32],
+            'package': f"prepay_id=mock_prepay_{order.id}_{timestamp}",
+            'signType': 'RSA',
+            'paySign': 'mock_pay_sign'
+        }
+        is_mock = True
 
     return jsonify(code=0, msg='订单创建成功', data={
         'orderId': str(order.id),
@@ -103,7 +146,7 @@ def purchase():
         'amount': amount,
         'type': member_type,
         'typeLabel': type_labels.get(member_type, member_type),
-        'isMock': not has_real_mch,
+        'isMock': is_mock,
         'payment': payment_params
     })
 
@@ -127,9 +170,29 @@ def query_order_status():
     if not order:
         return jsonify(code=404, msg='订单不存在'), 404
 
-    # 简单校验所有权
+    # 校验所有权
     if user_id and str(order.user_id) != str(user_id):
         return jsonify(code=403, msg='无权查看该订单'), 403
+
+    # 若本地仍是 pending 且配置了微信商户，主动向微信查单同步，避免回调丢失
+    if order.status == 'pending' and wechat_pay.is_configured():
+        try:
+            wx_data = wechat_pay.query_order(order.order_no)
+            trade_state = wx_data.get('trade_state')
+            if trade_state == 'SUCCESS':
+                order.status = 'paid'
+                order.transaction_id = wx_data.get('transaction_id')
+                success_time = wx_data.get('success_time')
+                order.paid_at = datetime.fromisoformat(success_time.replace('Z', '+00:00')) if success_time else datetime.utcnow()
+                user = User.query.get(order.user_id)
+                if user:
+                    grant_membership_to_user(user, order.type)
+                db.session.commit()
+            elif trade_state in ('CLOSED', 'REVOKED', 'PAYERROR'):
+                order.status = 'failed'
+                db.session.commit()
+        except Exception as e:
+            logger.warning(f"主动向微信查单异常: {e}")
 
     return jsonify(code=0, msg='获取成功', data=order.to_dict())
 
@@ -183,14 +246,80 @@ def mock_pay_success():
 @membership_bp.route('/notify', methods=['POST'])
 def wx_pay_notify():
     """
-    微信支付异步回调通知接口（预留）
+    微信支付 V3 异步回调通知接口
     微信支付成功后会向该地址 POST 发送加密通知
     """
-    # 真实商户环境接入步骤:
-    # 1. 验证微信支付平台签名（避免伪造）
-    # 2. 使用 APIv3Key 对 resource 报文解密，获取 order_no、transaction_id、trade_state
-    # 3. 校验金额与币种
-    # 4. 更新订单为 paid，并调用 grant_membership_to_user(user, order.type)
-    # 5. 返回微信规定的 200/SUCCESS JSON 响应
-    return jsonify(code="SUCCESS", message="成功")
+    try:
+        # 1. 获取微信通知 Header 参数
+        timestamp = request.headers.get('Wechatpay-Timestamp', '')
+        nonce = request.headers.get('Wechatpay-Nonce', '')
+        signature = request.headers.get('Wechatpay-Signature', '')
+        serial_no = request.headers.get('Wechatpay-Serial', '')
+        body_text = request.get_data(as_text=True)
 
+        if not signature or not timestamp or not nonce:
+            logger.warning("微信回调缺少签名参数")
+            return jsonify(code="FAIL", message="签名参数缺失"), 400
+
+        # 2. 验签 (使用微信支付公钥 pub_key.pem)
+        if not wechat_pay.verify_callback_signature(timestamp, nonce, body_text, signature):
+            logger.error("微信支付回调签名验证失败")
+            return jsonify(code="FAIL", message="签名验证失败"), 401
+
+        # 3. 解析请求 JSON 并解密 resource
+        notify_data = json.loads(body_text) if body_text else {}
+        event_type = notify_data.get('event_type')
+        if event_type != 'TRANSACTION.SUCCESS':
+            # 非支付成功事件直接返回 SUCCESS 确认
+            return jsonify(code="SUCCESS", message="成功")
+
+        resource = notify_data.get('resource', {})
+        associated_data = resource.get('associated_data', '')
+        resource_nonce = resource.get('nonce', '')
+        ciphertext = resource.get('ciphertext', '')
+
+        plain_data = wechat_pay.decrypt_callback_resource(associated_data, resource_nonce, ciphertext)
+        logger.info(f"微信支付回调解密结果: {plain_data}")
+
+        # 4. 校验订单号与状态
+        out_trade_no = plain_data.get('out_trade_no')
+        trade_state = plain_data.get('trade_state')
+        transaction_id = plain_data.get('transaction_id')
+        total_fee = plain_data.get('amount', {}).get('total', 0)
+
+        if not out_trade_no or trade_state != 'SUCCESS':
+            return jsonify(code="SUCCESS", message="非成功状态无需处理")
+
+        order = MembershipOrder.query.filter_by(order_no=out_trade_no).first()
+        if not order:
+            logger.error(f"微信支付回调未找到订单: {out_trade_no}")
+            return jsonify(code="SUCCESS", message="订单不存在")
+
+        # 幂等处理：如果已支付，直接返回成功
+        if order.status == 'paid':
+            return jsonify(code="SUCCESS", message="成功")
+
+        # 校验金额 (数据库金额为元，微信为分)
+        expected_cents = int(order.amount * 100)
+        if total_fee != expected_cents:
+            logger.error(f"订单金额不一致: 期望 {expected_cents}分, 微信通知 {total_fee}分")
+            return jsonify(code="FAIL", message="订单金额不一致"), 400
+
+        # 5. 更新订单状态并开通/续费会员权益
+        now = datetime.utcnow()
+        order.status = 'paid'
+        order.transaction_id = transaction_id
+        order.paid_at = now
+
+        user = User.query.get(order.user_id)
+        if user:
+            grant_membership_to_user(user, order.type)
+
+        db.session.commit()
+        logger.info(f"订单 {out_trade_no} 支付成功，已为用户 {order.user_id} 开通 {order.type}")
+
+        return jsonify(code="SUCCESS", message="成功")
+
+    except Exception as e:
+        logger.exception(f"处理微信支付回调异常: {e}")
+        return jsonify(code="FAIL", message=str(e)), 500

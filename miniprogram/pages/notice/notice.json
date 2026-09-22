@@ -3,5 +3,6 @@
     "filter-bar": "/components/filter-bar/filter-bar",
     "notice-card": "/components/notice-card/notice-card"
   },
-  "navigationBarTitleText": "启事"
+  "navigationBarTitleText": "启事",
+  "enablePullDownRefresh": true
 }

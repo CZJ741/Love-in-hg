@@ -4,6 +4,7 @@ import re
 from flask import Blueprint, request, jsonify
 from models import db, User, Notice
 from datetime import datetime
+from utils.wechat_pay import wechat_pay
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -34,7 +35,6 @@ def login():
             phone=phone,
             name=notice.name,
             gender=notice.gender,
-            birthday=notice.birthday or '',
             occupation=notice.occupation or '',
             income=notice.income or '',
             is_public_sector=notice.is_public_sector or False,
@@ -54,3 +54,36 @@ def login():
         'user': user.to_dict(),
         'isNewUser': False
     })
+
+
+@auth_bp.route('/wx-login', methods=['POST'])
+def wx_login():
+    """
+    通过小程序 wx.login 的 code 换取 openid 并绑定/登录
+    """
+    data = request.get_json() or {}
+    code = (data.get('code') or '').strip()
+    user_id = data.get('userId')
+
+    if not code:
+        return jsonify(code=400, msg='缺少微信登录凭证 code'), 400
+
+    try:
+        session_info = wechat_pay.code2session(code)
+        openid = session_info.get('openid')
+        if not openid:
+            return jsonify(code=400, msg='获取 openid 失败'), 400
+
+        user = None
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                user.openid = openid
+                db.session.commit()
+
+        return jsonify(code=0, msg='成功获取 openid', data={
+            'openid': openid,
+            'user': user.to_dict() if user else None
+        })
+    except Exception as e:
+        return jsonify(code=500, msg=str(e)), 500

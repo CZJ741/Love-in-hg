@@ -53,38 +53,60 @@ def create_app():
     # 初始化数据库
     db.init_app(app)
 
-    # 自动检查并补充缺失的字段（如 images, publisher_role, housing_location, age, social_account 字段）
+    # 自动检查并补充缺失的字段/表，保证老数据库升级后结构完整
+    #
+    # 说明：项目未接入 Alembic，改用「启动时幂等补齐」的方式做轻量迁移。
+    # 这里显式调用 db.create_all()，确保模型新增的表（如 membership_orders）
+    # 在老库上也会被自动创建，避免 "Unknown column / Table doesn't exist" 类报错。
     with app.app_context():
         try:
+            db.create_all()
+        except Exception as e:
+            app.logger.warning(f"db.create_all() 失败（不影响启动）: {e}")
+
+        try:
             from sqlalchemy import text
-            with db.engine.connect() as conn:
-                result = conn.execute(text("SHOW COLUMNS FROM notices LIKE 'images'"))
-                if not result.fetchone():
-                    conn.execute(text("ALTER TABLE notices ADD COLUMN images TEXT COMMENT '照片列表(JSON数组)' AFTER weight"))
-                    conn.commit()
 
-                result_pub = conn.execute(text("SHOW COLUMNS FROM notices LIKE 'publisher_role'"))
-                if not result_pub.fetchone():
-                    conn.execute(text("ALTER TABLE notices ADD COLUMN publisher_role VARCHAR(20) DEFAULT '本人' COMMENT '发布人身份' AFTER user_id"))
-                    conn.commit()
+            # 需要补齐的列：(表名, 列名, 建列 SQL)
+            required_columns = [
+                ('notices', 'images',
+                 "ALTER TABLE notices ADD COLUMN images TEXT COMMENT '照片列表(JSON数组)' AFTER weight"),
+                ('notices', 'publisher_role',
+                 "ALTER TABLE notices ADD COLUMN publisher_role VARCHAR(20) DEFAULT '本人' COMMENT '发布人身份' AFTER user_id"),
+                ('notices', 'age',
+                 "ALTER TABLE notices ADD COLUMN age INT DEFAULT 0 COMMENT '年龄' AFTER gender"),
+                ('notices', 'housing_location',
+                 "ALTER TABLE notices ADD COLUMN housing_location VARCHAR(20) DEFAULT '本地' COMMENT '住房位置' AFTER age"),
+                ('notices', 'social_account',
+                 "ALTER TABLE notices ADD COLUMN social_account VARCHAR(100) DEFAULT '' COMMENT '社交账号' AFTER age"),
+                # 以下为会员订单表历史缺失字段（2026-09-15 补充）
+                ('membership_orders', 'order_no',
+                 "ALTER TABLE membership_orders ADD COLUMN order_no VARCHAR(32) NULL COMMENT '商户订单号' AFTER id"),
+                ('membership_orders', 'transaction_id',
+                 "ALTER TABLE membership_orders ADD COLUMN transaction_id VARCHAR(64) NULL COMMENT '微信支付交易单号' AFTER order_no"),
+            ]
 
-                result_age = conn.execute(text("SHOW COLUMNS FROM notices LIKE 'age'"))
-                if not result_age.fetchone():
-                    conn.execute(text("ALTER TABLE notices ADD COLUMN age INT DEFAULT 0 COMMENT '年龄' AFTER gender"))
-                    conn.commit()
+            with db.engine.begin() as conn:
+                for table, column, ddl in required_columns:
+                    # 表不存在时跳过（create_all 已负责建表）
+                    if not conn.execute(text("SHOW TABLES LIKE :t"), {'t': table}).fetchone():
+                        continue
+                    exists = conn.execute(
+                        text("SHOW COLUMNS FROM `%s` LIKE :c" % table), {'c': column}
+                    ).fetchone()
+                    if not exists:
+                        conn.execute(text(ddl))
+                        app.logger.info(f"自动迁移: {table}.{column} 已补齐")
 
-                result_house = conn.execute(text("SHOW COLUMNS FROM notices LIKE 'housing_location'"))
-                if not result_house.fetchone():
-                    conn.execute(text("ALTER TABLE notices ADD COLUMN housing_location VARCHAR(20) DEFAULT '本地' COMMENT '住房位置' AFTER birthday"))
-                    conn.commit()
-
-                result_social = conn.execute(text("SHOW COLUMNS FROM notices LIKE 'social_account'"))
-                if not result_social.fetchone():
-                    conn.execute(text("ALTER TABLE notices ADD COLUMN social_account VARCHAR(100) DEFAULT '' COMMENT '社交账号' AFTER birthday"))
-                    conn.commit()
+                # order_no 的唯一索引单独补齐（ADD COLUMN 时不带 UNIQUE，便于老数据为空值）
+                if conn.execute(text("SHOW TABLES LIKE 'membership_orders'")).fetchone():
+                    idx = conn.execute(text("SHOW INDEX FROM membership_orders WHERE Key_name = 'uk_order_no'")).fetchone()
+                    if not idx:
+                        conn.execute(text("ALTER TABLE membership_orders ADD UNIQUE KEY uk_order_no (order_no)"))
+                        app.logger.info("自动迁移: membership_orders.uk_order_no 唯一索引已补齐")
         except Exception as e:
             # 若表未创建或连接异常，不阻断启动
-            pass
+            app.logger.warning(f"自动迁移检查失败（不阻断启动）: {e}")
 
 
     # 注册蓝图
