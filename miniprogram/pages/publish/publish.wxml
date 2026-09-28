@@ -7,7 +7,7 @@
         <text class="page-title">我的启事</text>
         <text class="page-count" wx:if="{{myNotices.length > 0}}">共 {{myNotices.length}} 条</text>
       </view>
-      <view class="btn-create" bindtap="onNewNotice">
+      <view class="btn-create" wx:if="{{isLoggedIn}}" bindtap="onNewNotice">
         <text class="icon-plus">+</text>
         <text class="btn-create-text">新增启事</text>
       </view>
@@ -23,12 +23,17 @@
       <text class="loading-text">正在加载启事...</text>
     </view>
 
-    <!-- 空状态 -->
-    <view class="empty-card" wx:if="{{myNotices.length === 0 && !loading}}">
+    <!-- 未登录访客空状态 -->
+    <view class="empty-card" wx:if="{{!isLoggedIn}}">
+      <view class="empty-art">🔒</view>
+      <button class="btn-empty-action" bindtap="onGoLogin">去登录</button>
+    </view>
+
+    <!-- 已登录无启事空状态 -->
+    <view class="empty-card" wx:elif="{{myNotices.length === 0 && !loading}}">
       <view class="empty-art">💌</view>
-      <text class="empty-title">还没有发布相亲启事</text>
-      <text class="empty-desc">发布启事，让对的人在这里与您相遇</text>
-      <button class="btn-empty-action" bindtap="onNewNotice">立即发布第一条启事</button>
+      <text class="empty-title">还没有发布启事</text>
+      <text class="empty-desc"></text>
     </view>
 
     <!-- 完整启事卡片流 -->
@@ -119,7 +124,7 @@
       <!-- 个人备注 -->
       <view class="card-quote" wx:if="{{item.remark}}">
         <view class="quote-head">
-          <text class="quote-tag">个人心语与要求</text>
+          <text class="quote-tag">备注：</text>
         </view>
         <text class="quote-content">{{item.remark}}</text>
       </view>
@@ -142,4 +147,7 @@
       </view>
     </view>
   </view>
+
+  <!-- 隐私授权合规弹窗 -->
+  <privacy-popup></privacy-popup>
 </view>

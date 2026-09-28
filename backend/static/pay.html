@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>会员中心 - 相亲角专属开通通道</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header-banner {
+      background: linear-gradient(135deg, #ff5e62 0%, #ff9966 100%);
+      color: #ffffff;
+      padding: 44px 20px 28px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(255, 94, 98, 0.25);
+    }
+    .header-banner h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .header-banner p {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    .container {
+      flex: 1;
+      padding: 16px;
+      max-width: 480px;
+      margin: -16px auto 0;
+      width: 100%;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      border: 1px solid #f1f5f9;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .icon {
+      font-size: 18px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 6px;
+      display: block;
+    }
+    .input-box {
+      width: 100%;
+      height: 46px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0 14px;
+      font-size: 15px;
+      color: #1e293b;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .input-box:focus {
+      border-color: #ff5e62;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(255, 94, 98, 0.12);
+    }
+    .verify-row {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-sms {
+      width: 120px;
+      height: 46px;
+      background: #fff0f0;
+      color: #e74c3c;
+      border: 1px solid #ffccd0;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .btn-sms:disabled {
+      background: #f1f5f9;
+      color: #94a3b8;
+      border-color: #e2e8f0;
+      cursor: not-allowed;
+    }
+    .btn-login {
+      width: 100%;
+      height: 46px;
+      background: #1e293b;
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      margin-top: 4px;
+      cursor: pointer;
+    }
+    .user-profile-badge {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 12px 14px;
+      border: 1px solid #e2e8f0;
+    }
+    .user-profile-info .u-phone {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .user-profile-info .u-expire {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .tier-tag {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tier-free { background: #e2e8f0; color: #475569; }
+    .tier-member { background: #ffe4e6; color: #e11d48; }
+    .tier-vip { background: #fef3c7; color: #b45309; }
+
+    /* 会员套餐卡片 */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .plan-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 16px 12px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      background: #ffffff;
+      transition: all 0.2s;
+    }
+    .plan-card.active {
+      border-color: #e74c3c;
+      background: #fff8f8;
+      box-shadow: 0 4px 14px rgba(231, 76, 60, 0.15);
+    }
+    .plan-badge {
+      position: absolute;
+      top: -10px;
+      right: -6px;
+      background: linear-gradient(135deg, #e74c3c, #ff7675);
+      color: #ffffff;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .plan-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .plan-price {
+      font-size: 22px;
+      font-weight: 800;
+      color: #e74c3c;
+      margin: 8px 0;
+    }
+    .plan-price span {
+      font-size: 12px;
+      font-weight: 400;
+      color: #64748b;
+    }
+    .plan-desc {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+    .btn-pay {
+      width: 100%;
+      height: 50px;
+      background: linear-gradient(135deg, #ff5e62, #e74c3c);
+      color: #ffffff;
+      border: none;
+      border-radius: 25px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(231, 76, 60, 0.35);
+      transition: all 0.2s;
+    }
+    .btn-pay:active {
+      transform: scale(0.98);
+      box-shadow: 0 2px 10px rgba(231, 76, 60, 0.2);
+    }
+    .compliance-footer {
+      text-align: center;
+      padding: 16px 20px 30px;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+    .success-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .success-modal.show {
+      display: flex;
+    }
+    .success-box {
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 32px 24px 28px;
+      text-align: center;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    .success-icon {
+      font-size: 52px;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .success-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    .success-desc {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .btn-back-mp {
+      width: 100%;
+      height: 46px;
+      background: #10b981;
+      color: #ffffff;
+      border: none;
+      border-radius: 23px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 头部氛围区 -->
+  <div class="header-banner">
+    <h1>相亲角 · 会员服务中心</h1>
+    <p>全平台权益实时互通 · 开通即享专属相亲配额</p>
+  </div>
+
+  <div class="container">
+    <!-- 步骤 1：账号识别卡片 -->
+    <div class="card" id="accountSection">
+      <div class="card-title">
+        <span class="icon">👤</span> 1. 验证相亲账号
+      </div>
+
+      <!-- 登录前表单 -->
+      <div id="loginForm">
+        <div class="form-group">
+          <label class="form-label">手机号码</label>
+          <input type="tel" id="inputPhone" class="input-box" maxlength="11" placeholder="输入小程序注册手机号">
+        </div>
+        <div class="form-group">
+          <label class="form-label">短信验证码</label>
+          <div class="verify-row">
+            <input type="number" id="inputCode" class="input-box" maxlength="6" placeholder="6位验证码">
+            <button class="btn-sms" id="btnSendSms" onclick="sendSmsCode()">获取验证码</button>
+          </div>
+        </div>
+        <button class="btn-login" id="btnLogin" onclick="loginAccount()">确认身份</button>
+      </div>
+
+      <!-- 登录后卡片 -->
+      <div id="userInfoBox" style="display:none;">
+        <div class="user-profile-badge">
+          <div class="user-profile-info">
+            <div class="u-phone" id="displayPhone">138****0000</div>
+            <div class="u-expire" id="displayExpire">普通用户</div>
+          </div>
+          <span class="tier-tag tier-free" id="displayTierBadge">免费用户</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 步骤 2：开通套餐选择 -->
+    <div class="card">
+      <div class="card-title">
+        <span class="icon">💎</span> 2. 选择会员套餐
+      </div>
+      <div class="plans-grid">
+        <!-- 会员 -->
+        <div class="plan-card active" id="planMember" onclick="selectPlan('member')">
+          <span class="plan-badge">限时特惠</span>
+          <div class="plan-name">会员</div>
+          <div class="plan-price" id="memberPrice">¥0.01 <span>/年</span></div>
+          <div class="plan-desc">每月分配 30 条<br>优质相亲启事</div>
+        </div>
+        <!-- 大会员 -->
+        <div class="plan-card" id="planVip" onclick="selectPlan('vip')">
+          <span class="plan-badge">海量推荐</span>
+          <div class="plan-name">大会员</div>
+          <div class="plan-price" id="vipPrice">¥0.02 <span>/年</span></div>
+          <div class="plan-desc">每天分配 30 条<br>畅享海量互选</div>
+        </div>
+      </div>
+
+      <button class="btn-pay" id="btnPay" onclick="handlePay()">立即开通 (¥0.01)</button>
+    </div>
+
+    <!-- 多端互通说明 -->
+    <div class="card" style="background:#fffaf0;border-color:#feebc8;">
+      <div style="font-size:13px;color:#c05621;line-height:1.6;">
+        <strong>⚡ 多端权益自动互通说明：</strong><br>
+        本页面专为 iOS 及移动网页端提供正规微信支付结算通道。支付成功后，您的相亲角会员特权将<b>实时同步</b>至同一手机号下的小程序，返回微信即可畅享专属权益。
+      </div>
+    </div>
+
+    <div class="compliance-footer">
+      相亲角网络平台 · 微信支付安全保障<br>
+      订单资金与数据受微信官方商户安全体系保护
+    </div>
+  </div>
+
+  <!-- 成功弹窗 -->
+  <div class="success-modal" id="successModal">
+    <div class="success-box">
+      <span class="success-icon">🎉</span>
+      <div class="success-title">会员开通成功！</div>
+      <div class="success-desc">您的权益已与微信小程序实时同步。<br>请直接返回微信搜索或打开“相亲角”小程序查看权益！</div>
+      <button class="btn-back-mp" onclick="location.reload()">我知道了</button>
+    </div>
+  </div>
+
+  <script>
+    let currentPlan = 'member';
+    let currentPrices = { member: 0.01, vip: 0.02 };
+    let currentUser = null;
+    let countdown = 0;
+    let smsTimer = null;
+    let pollTimer = null;
+
+    // 页面初始化
+    window.onload = function() {
+      // 1. 读取 url 参数 phone
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramPhone = urlParams.get('phone');
+      if (paramPhone && /^1[3-9]\d{9}$/.test(paramPhone)) {
+        document.getElementById('inputPhone').value = paramPhone;
+      }
+
+      // 2. 加载会员配置
+      loadConfig();
+
+      // 3. 检查是否有未完成的订单轮询
+      const pendingOrderNo = sessionStorage.getItem('pending_order_no');
+      if (pendingOrderNo) {
+        startPolling(pendingOrderNo);
+      }
+    };
+
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/membership/config');
+        const data = await res.json();
+        if (data.code === 0 && data.data && data.data.prices) {
+          currentPrices = data.data.prices;
+          document.getElementById('memberPrice').innerHTML = `¥${currentPrices.member} <span>/年</span>`;
+          document.getElementById('vipPrice').innerHTML = `¥${currentPrices.vip} <span>/年</span>`;
+          updatePayBtnText();
+        }
+      } catch (e) {
+        console.warn('获取配置失败:', e);
+      }
+    }
+
+    function selectPlan(plan) {
+      currentPlan = plan;
+      document.getElementById('planMember').classList.toggle('active', plan === 'member');
+      document.getElementById('planVip').classList.toggle('active', plan === 'vip');
+      updatePayBtnText();
+    }
+
+    function updatePayBtnText() {
+      const price = currentPlan === 'vip' ? currentPrices.vip : currentPrices.member;
+      const name = currentPlan === 'vip' ? '大会员' : '会员';
+      document.getElementById('btnPay').innerText = `立即开通${name} (¥${price}/年)`;
+    }
+
+    // 发送验证码
+    async function sendSmsCode() {
+      if (countdown > 0) return;
+      const phone = document.getElementById('inputPhone').value.trim();
+      if (!/^1[3-9]\d{9}$/.test(phone)) {
+        alert('请输入正确的11位手机号码');
+        return;
+      }
+
+      const btn = document.getElementById('btnSendSms');
+      btn.disabled = true;
+      btn.innerText = '发送中...';
+
+      try {
+        const res = await fetch('/api/auth/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const data = await res.json();
+        if (data.code === 0) {
+          alert('验证码已发送至您的手机');
+          countdown = 60;
+          btn.innerText = `${countdown}s`;
+          smsTimer = setInterval(() => {
+            countdown--;
+            if (countdown <= 0) {
+              clearInterval(smsTimer);
+              btn.disabled = false;
+              btn.innerText = '获取验证码';
+            } else {
+              btn.innerText = `${countdown}s`;
+            }
+          }, 1000);
+        } else {
+          alert(data.msg || '发送验证码失败');
+          btn.disabled = false;
+          btn.innerText = '获取验证码';
+        }
+      } catch (e) {
+        alert('网络异常，请稍后重试');
+        btn.disabled = false;
+        btn.innerText = '获取验证码';
+      }
+    }
+
+    // 登录/确认账号
+    async function loginAccount() {
+      const phone = document.getElementById('inputPhone').value.trim();
+      const code = document.getElementById('inputCode').value.trim();
+
+      if (!/^1[3-9]\d{9}$/.test(phone)) {
+        alert('请输入正确的手机号');
+        return;
+      }
+      if (!code || code.length < 4) {
+        alert('请输入收到的短信验证码');
+        return;
+      }
+
+      const btn = document.getElementById('btnLogin');
+      btn.innerText = '正在验证...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/verify-register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, code })
+        });
+        const data = await res.json();
+        btn.innerText = '确认身份';
+        btn.disabled = false;
+
+        if (data.code === 0 && data.data && data.data.user) {
+          currentUser = data.data.user;
+          renderUserInfo(currentUser);
+        } else {
+          alert(data.msg || '验证失败');
+        }
+      } catch (e) {
+        btn.innerText = '确认身份';
+        btn.disabled = false;
+        alert('网络请求失败，请稍后重试');
+      }
+    }
+
+    function renderUserInfo(user) {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('userInfoBox').style.display = 'block';
+
+      const masked = user.phone ? user.phone.slice(0, 3) + '****' + user.phone.slice(7) : '';
+      document.getElementById('displayPhone').innerText = `账号：${masked}`;
+
+      const tierNames = { free: '普通用户', member: '会员', vip: '大会员' };
+      const tierName = tierNames[user.membershipType] || '普通用户';
+
+      let expireText = '当前未开通会员';
+      if (user.membershipExpire) {
+        expireText = `到期时间：${user.membershipExpire.split('T')[0]}`;
+      }
+      document.getElementById('displayExpire').innerText = expireText;
+
+      const badge = document.getElementById('displayTierBadge');
+      badge.innerText = tierName;
+      badge.className = `tier-tag tier-${user.membershipType || 'free'}`;
+    }
+
+    // 发起支付
+    async function handlePay() {
+      const phone = currentUser ? currentUser.phone : document.getElementById('inputPhone').value.trim();
+      if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
+        alert('请先完成第1步手机号身份验证');
+        return;
+      }
+
+      const btn = document.getElementById('btnPay');
+      btn.disabled = true;
+      btn.innerText = '正在拉起微信支付...';
+
+      try {
+        const returnUrl = window.location.href.split('#')[0];
+        const res = await fetch('/api/membership/h5-purchase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Id': currentUser ? String(currentUser.id) : ''
+          },
+          body: JSON.stringify({
+            phone,
+            type: currentPlan,
+            redirectUrl: returnUrl
+          })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        updatePayBtnText();
+
+        if (data.code !== 0) {
+          alert(data.msg || '创建订单失败');
+          return;
+        }
+
+        const { orderNo, payType, h5Url, orderId } = data.data;
+
+        if (payType === 'wechat_h5' && h5Url) {
+          sessionStorage.setItem('pending_order_no', orderNo);
+          // 跳转拉起微信支付
+          window.location.href = h5Url;
+        } else if (payType === 'mock') {
+          // 模拟体验支付
+          const mockRes = await fetch('/api/membership/mock-pay-success', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, orderNo })
+          });
+          const mockData = await mockRes.json();
+          if (mockData.code === 0) {
+            document.getElementById('successModal').classList.add('show');
+          } else {
+            alert(mockData.msg || '模拟支付处理异常');
+          }
+        }
+      } catch (e) {
+        btn.disabled = false;
+        updatePayBtnText();
+        alert('网络请求异常，请稍后重试');
+      }
+    }
+
+    // 轮询订单状态
+    function startPolling(orderNo) {
+      let attempts = 0;
+      pollTimer = setInterval(async () => {
+        attempts++;
+        if (attempts > 30) {
+          clearInterval(pollTimer);
+          sessionStorage.removeItem('pending_order_no');
+          return;
+        }
+        try {
+          const res = await fetch(`/api/membership/order/status?orderNo=${orderNo}`);
+          const data = await res.json();
+          if (data.code === 0 && data.data && data.data.status === 'paid') {
+            clearInterval(pollTimer);
+            sessionStorage.removeItem('pending_order_no');
+            document.getElementById('successModal').classList.add('show');
+          }
+        } catch (e) {}
+      }, 1500);
+    }
+  </script>
+</body>
+</html>

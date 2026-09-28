@@ -26,6 +26,7 @@ Component({
 
   data: {
     age: 0,
+    displayName: '',
     showPhotoModal: false
   },
 
@@ -36,6 +37,22 @@ Component({
         return;
       }
       this.setData({ age: 0 });
+    },
+    'notice.name, isLoggedIn'(name, isLoggedIn) {
+      if (!name) {
+        this.setData({ displayName: '' });
+        return;
+      }
+      // 访客模式（未登录）：隐藏姓氏直接显示，如 陈子杰 -> *子杰，李四 -> *四
+      if (!isLoggedIn) {
+        if (name.length > 1) {
+          this.setData({ displayName: '*' + name.slice(1) });
+        } else {
+          this.setData({ displayName: '*' });
+        }
+      } else {
+        this.setData({ displayName: name });
+      }
     }
   },
 

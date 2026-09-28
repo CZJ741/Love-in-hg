@@ -1,8 +1,8 @@
 // utils/api.js
 // Python 后端 REST API 调用封装
 
-const BASE_URL = 'http://127.0.0.1:5000/api';  // 生产环境服务器地址
-// const BASE_URL = 'https://aibao.love/api';  // 本地开发调试地址
+const BASE_URL = 'https://aibao.love/api';  // 生产环境服务器地址
+// const BASE_URL = 'http://127.0.0.1:5000/api';  // 本地开发调试地址
 /**
  * 通用请求方法
  */
@@ -15,6 +15,7 @@ function request(path, options = {}) {
       url: `${BASE_URL}${path}`,
       method,
       data,
+      timeout: 6000,
       header: {
         'Content-Type': 'application/json',
         'X-User-Id': userId,
@@ -28,8 +29,9 @@ function request(path, options = {}) {
         }
       },
       fail(err) {
-        console.error('API Error:', path, err);
-        reject(err);
+        // 请求失败平滑返回对象，不抛未捕获异常
+        console.warn('API Error/Timeout:', path, err.errMsg || err);
+        resolve({ code: -1, msg: err.errMsg || '网络请求超时' });
       }
     });
   });
@@ -55,10 +57,24 @@ function post(path, data = {}) {
 }
 
 /**
- * 手机号登录
+ * 预留手机号登录（带微信 code 用于自动绑定 openid）
  */
-function login(phone) {
-  return post('/auth/login', { phone });
+function login(phone, code = '') {
+  return post('/auth/login', { phone, code });
+}
+
+/**
+ * 发送短信验证码
+ */
+function sendSms(phone) {
+  return post('/auth/send-sms', { phone });
+}
+
+/**
+ * 手机号验证码验证/注册
+ */
+function verifyRegister(phone, code, wxCode = '') {
+  return post('/auth/verify-register', { phone, code, wxCode });
 }
 
 /**
@@ -170,10 +186,27 @@ function requestPayment(paymentParams) {
 }
 
 /**
- * 注销账号（删除用户及全部关联数据）
+ * 注销账号（验证码核验后，删除用户及全部关联数据）
+ * @param {string} code 短信验证码
  */
-function deleteAccount() {
-  return post('/user/deleteAccount');
+function deleteAccount(code = '') {
+  return post('/user/deleteAccount', { code });
+}
+
+/**
+ * 举报违规启事
+ * @param {Object} data { noticeId, reason, description }
+ */
+function reportNotice(data) {
+  return post('/notice/report', data);
+}
+
+/**
+ * 屏蔽/拉黑用户
+ * @param {Object} data { targetUserId, noticeId }
+ */
+function blockUser(data) {
+  return post('/user/block', data);
 }
 
 /**
@@ -252,6 +285,8 @@ module.exports = {
   get,
   post,
   login,
+  sendSms,
+  verifyRegister,
   publishNotice,
   updateNotice,
   deleteNotice,
@@ -266,6 +301,8 @@ module.exports = {
   mockPaySuccess,
   requestPayment,
   deleteAccount,
+  reportNotice,
+  blockUser,
   extractAndImport,
   uploadImage,
   uploadImages

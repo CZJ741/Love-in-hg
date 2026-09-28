@@ -1,7 +1,13 @@
 <!-- pages/publish-edit/publish-edit.wxml -->
 <view class="container">
   <view class="publish-header card">
-    <text class="publish-title">{{isEdit ? '修改' : '发布'}}</text>
+    <view class="header-left">
+      <text class="publish-title">{{isEdit ? '修改启事' : '发布启事'}}</text>
+    </view>
+    <view class="draft-action" wx:if="{{!isEdit}}">
+      <view class="btn-draft-save" bindtap="onSaveDraft">暂存草稿</view>
+      <view class="btn-draft-clear" wx:if="{{hasDraft}}" bindtap="onClearDraft">清除暂存</view>
+    </view>
   </view>
 
 
@@ -28,14 +34,12 @@
     <view class="form-item">
       <text class="form-label">联系方式 <text class="required">*</text></text>
       <input
-        class="form-input"
+        class="form-input disabled-input"
         type="number"
         maxlength="11"
-        placeholder="请输入手机号码"
+        placeholder="登录手机号自动关联"
         value="{{form.phone}}"
-        bindinput="onFieldChange"
-        data-field="phone"
-        disabled="{{isEdit}}"
+        disabled="true"
       />
     </view>
   </view>
@@ -112,7 +116,7 @@
   <view class="form-section card">
     <view class="section-header-row">
       <text class="section-title mb-0">上传照片</text>
-      <text class="section-subtitle">最多上传9张，展示真实风采（{{images.length}}/9）</text>
+      <text class="section-subtitle">展示真实风采（{{images.length}}/9）</text>
     </view>
     <view class="uploader-grid">
       <view class="uploader-item" wx:for="{{images}}" wx:key="index">
@@ -198,4 +202,6 @@
 
   <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{submitting}}">{{isEdit ? '保存修改' : '发布'}}</button>
 
+  <!-- 隐私授权合规弹窗 -->
+  <privacy-popup></privacy-popup>
 </view>

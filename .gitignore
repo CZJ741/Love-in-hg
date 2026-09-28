@@ -60,6 +60,15 @@ backend.zip
 .DS_Store
 Thumbs.db
 
+# Node / Frontend
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+
 # Logs & Temporary Files
 *.log
 *.tmp

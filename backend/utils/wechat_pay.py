@@ -161,6 +161,58 @@ class WeChatPayV3:
 
         return res_json
 
+    def h5_order(self, out_trade_no: str, total_amount_cents: int, description: str, client_ip: str, notify_url: str = None) -> dict:
+        """
+        发起微信支付 H5 统一下单（供手机浏览器调用并拉起微信 App 支付）
+        :param out_trade_no: 商户订单号
+        :param total_amount_cents: 金额 (单位：分)
+        :param description: 商品描述
+        :param client_ip: 用户的真实公网客户端IP
+        :param notify_url: 支付结果通知回调地址
+        :return: 微信返回字典，包含 h5_url
+        """
+        url = "https://api.mch.weixin.qq.com/v3/pay/transactions/h5"
+        path = "/v3/pay/transactions/h5"
+        callback_url = notify_url or self.notify_url
+
+        payload = {
+            "appid": self.app_id,
+            "mchid": self.mch_id,
+            "description": description,
+            "out_trade_no": out_trade_no,
+            "notify_url": callback_url,
+            "amount": {
+                "total": total_amount_cents,
+                "currency": "CNY"
+            },
+            "scene_info": {
+                "payer_client_ip": client_ip or "127.0.0.1",
+                "h5_info": {
+                    "type": "Wap"
+                }
+            }
+        }
+        body = json.dumps(payload)
+        auth_header = self.build_authorization_header('POST', path, body)
+
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": auth_header,
+            "User-Agent": "Love-in-hg WeChatPay Client"
+        }
+
+        if self.public_key_id:
+            headers["Wechatpay-Serial"] = self.public_key_id
+
+        res = requests.post(url, data=body.encode('utf-8'), headers=headers, timeout=10)
+        res_json = res.json()
+        if res.status_code != 200:
+            logger.error(f"微信支付H5统一下单失败 [{res.status_code}]: {res.text}")
+            raise Exception(res_json.get('message', f'微信H5统一下单失败: {res.text}'))
+
+        return res_json
+
     def build_miniprogram_payment_params(self, prepay_id: str) -> dict:
         """
         生成小程序调用 wx.requestPayment 需要的参数与签名
@@ -264,12 +316,63 @@ class WeChatPayV3:
             "js_code": js_code,
             "grant_type": "authorization_code"
         }
-        res = requests.get(url, params=params, timeout=10)
+        try:
+            res = requests.get(url, params=params, timeout=4)
+            data = res.json()
+            if 'errcode' in data and data['errcode'] != 0:
+                logger.error(f"code2session 失败: {data}")
+                raise Exception(data.get('errmsg', '换取 openid 失败'))
+            return data
+        except requests.exceptions.Timeout:
+            logger.warning(f"微信 code2session 请求超时")
+            return {"openid": "", "session_key": "", "timeout": True}
+        except Exception as e:
+            logger.error(f"微信 code2session 发生异常: {e}")
+            raise e
+
+    @staticmethod
+    def get_stable_access_token() -> str:
+        """
+        获取小程序接口全局调用凭证 access_token (使用稳定版接口 getStableAccessToken)
+        """
+        app_id = Config.WX_APP_ID
+        app_secret = Config.WX_APP_SECRET
+        if not app_secret:
+            raise ValueError("未配置小程序 WX_APP_SECRET，无法获取 access_token")
+
+        url = "https://api.weixin.qq.com/cgi-bin/stable_token"
+        payload = {
+            "grant_type": "client_credential",
+            "appid": app_id,
+            "secret": app_secret,
+            "force_refresh": False
+        }
+        res = requests.post(url, json=payload, timeout=10)
         data = res.json()
-        if 'errcode' in data and data['errcode'] != 0:
-            logger.error(f"code2session 失败: {data}")
-            raise Exception(data.get('errmsg', '换取 openid 失败'))
-        return data
+        token = data.get('access_token')
+        if not token:
+            logger.error(f"获取 access_token 失败: {data}")
+            raise Exception(data.get('errmsg', '获取微信 access_token 失败'))
+        return token
+
+    @classmethod
+    def get_phone_number(cls, phone_code: str) -> str:
+        """
+        通过 button open-type="getPhoneNumber" 返回的 code 换取用户微信绑定的手机号
+        """
+        token = cls.get_stable_access_token()
+        url = f"https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token={token}"
+        payload = {"code": phone_code}
+        res = requests.post(url, json=payload, timeout=10)
+        data = res.json()
+        if data.get('errcode') != 0:
+            logger.error(f"获取微信手机号失败: {data}")
+            raise Exception(data.get('errmsg', '获取微信手机号失败'))
+        phone_info = data.get('phone_info') or {}
+        phone = phone_info.get('purePhoneNumber') or phone_info.get('phoneNumber')
+        if not phone:
+            raise Exception('微信返回的手机号为空')
+        return phone
 
 
 wechat_pay = WeChatPayV3()

@@ -1,0 +1,22 @@
+<!-- components/privacy-popup/privacy-popup.wxml -->
+<view class="privacy-mask" wx:if="{{showModal}}">
+  <view class="privacy-dialog">
+    <view class="privacy-header">
+      <text class="privacy-title">用户隐私保护指引</text>
+    </view>
+    <view class="privacy-body">
+      <text class="privacy-desc">在使用相亲角小程序服务前，请仔细阅读并同意</text>
+      <text class="privacy-link" bindtap="onOpenPrivacyContract">《用户隐私保护指引》</text>
+      <text class="privacy-desc">。我们仅在您上传启事照片（相册）或复制联系方式（剪贴板）时调用相应授权，绝不用于其他非法用途。</text>
+    </view>
+    <view class="privacy-footer">
+      <button class="btn-privacy-disagree" bindtap="onDisagree">不同意</button>
+      <button
+        id="agree-btn"
+        class="btn-privacy-agree"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onAgree"
+      >同意并继续</button>
+    </view>
+  </view>
+</view>

@@ -5,12 +5,12 @@
     <view class="profile-header flex-row">
       <view class="avatar">{{userInitial}}</view>
       <view class="profile-info">
-        <text class="profile-name">{{user.name || '未登录'}}</text>
+        <text class="profile-name">{{user.name || (user.phone ? '用户 ' + maskedUserPhone : '未登录')}}</text>
         <text class="profile-phone">{{user.phone || ''}}</text>
       </view>
       <text class="membership-badge {{membershipType}}">{{membershipName}}</text>
     </view>
-    <view class="profile-stats flex-between" wx:if="{{user.name}}">
+    <view class="profile-stats flex-between" wx:if="{{user.id || user.phone}}">
       <view class="stat-item">
         <text class="stat-num">{{noticeCount}}</text>
         <text class="stat-label">已发布</text>
@@ -25,15 +25,25 @@
       </view>
     </view>
     <!-- 未登录 -->
-    <view class="login-hint" wx:if="{{!user.name}}">
+    <view class="login-hint" wx:if="{{!user.id && !user.phone}}">
       <button class="btn-primary" style="width:100%;margin-top:20rpx;" bindtap="onShowLoginModal">手机号登录</button>
     </view>
   </view>
 
   <!-- 会员中心 -->
-  <view class="section card" wx:if="{{user.name}}">
+  <view class="section card" wx:if="{{user.id || user.phone}}">
     <view class="section-title">会员中心</view>
-    <view class="member-cards">
+
+    <!-- iOS 合规提示栏：屏蔽直接内购，提供外部多端互通开通指引 -->
+    <view class="ios-compliance-banner" wx:if="{{isIOS}}">
+      <view class="ios-banner-top">
+        <text class="ios-compliance-icon">ℹ️</text>
+        <text class="ios-compliance-text">由于微信小程序平台规范，iOS 设备暂不支持在小程序内直接开通。已开通特权支持全端自动互通！</text>
+      </view>
+      <button class="btn-copy-pay-link" bindtap="onCopyPayLink">复制外部专属开通链接</button>
+    </view>
+
+    <view class="member-cards" wx:if="{{!isIOS}}">
       <view class="member-card {{membershipType === 'free' ? 'current' : ''}}">
         <text class="member-name">普通用户</text>
         <text class="member-desc">每月10条</text>
@@ -61,7 +71,7 @@
   </view>
 
   <!-- 配额详情 -->
-  <view class="section card" wx:if="{{user.name}}">
+  <view class="section card" wx:if="{{user.id || user.phone}}">
     <view class="section-title">配额详情</view>
     <view class="quota-row flex-between">
       <text>{{periodLabel}}</text>
@@ -70,7 +80,7 @@
   </view>
 
   <!-- 离开按钮 -->
-  <button class="btn-outline logout-btn" wx:if="{{user.name}}" bindtap="onLogout">退出登录</button>
+  <button class="btn-outline logout-btn" wx:if="{{user.id || user.phone}}" bindtap="onLogout">退出登录</button>
 
   <!-- 账号与隐私 -->
   <view class="section card account-section">
@@ -82,19 +92,69 @@
       <text>隐私政策</text>
       <text class="account-arrow">›</text>
     </view>
-    <view class="account-item" wx:if="{{user.name}}" bindtap="onDeleteAccount">
+    <view class="account-item" wx:if="{{user.id || user.phone}}" bindtap="onDeleteAccount">
       <text class="danger-text">注销账号</text>
       <text class="account-arrow">›</text>
     </view>
   </view>
 
-  <!-- 手动登录弹窗 -->
+  <!-- 登录/验证弹窗 -->
   <view class="login-modal" wx:if="{{showLoginModal}}">
     <view class="login-card">
-      <view class="login-title">手机号登录</view>
-      <input class="login-input" type="number" maxlength="11" placeholder="请输入手机号码" value="{{loginPhone}}" bindinput="onPhoneInput" />
-      <button class="btn-primary login-btn" bindtap="onManualLogin">登录</button>
-      <text class="login-cancel" bindtap="onHideLogin">取消</text>
+      <view class="login-card-head">
+        <view class="auth-tabs">
+          <view class="auth-tab {{authMode === 'login' ? 'active' : ''}}" data-mode="login" bindtap="onSwitchAuthMode">登录</view>
+          <view class="auth-tab {{authMode === 'register' ? 'active' : ''}}" data-mode="register" bindtap="onSwitchAuthMode">注册</view>
+        </view>
+        <text class="login-close" bindtap="onHideLogin">✕</text>
+      </view>
+
+      <!-- 1. 登录：手机号直登 -->
+      <view class="auth-panel" wx:if="{{authMode === 'login'}}">
+        <input class="login-input" type="number" maxlength="11" placeholder="输入手机号" value="{{loginPhone}}" bindinput="onPhoneInput" />
+        <button class="btn-primary login-btn" bindtap="onManualLogin">登录</button>
+      </view>
+
+      <!-- 2. 注册：手机号验证码认证 -->
+      <view class="auth-panel" wx:if="{{authMode === 'register'}}">
+        <input class="login-input" type="number" maxlength="11" placeholder="输入手机号" value="{{regPhone}}" bindinput="onRegPhoneInput" />
+        <view class="verify-code-row">
+          <input class="login-input code-input" type="number" maxlength="6" placeholder="输入验证码" value="{{regCode}}" bindinput="onRegCodeInput" />
+          <button class="btn-send-code {{countdown > 0 ? 'disabled' : ''}}" bindtap="onSendSmsCode" disabled="{{countdown > 0}}">
+            {{countdown > 0 ? countdown + 's' : '获取验证码'}}
+          </button>
+        </view>
+        <button class="btn-primary login-btn" bindtap="onVerifyRegister" loading="{{verifying}}">注册</button>
+      </view>
     </view>
   </view>
+
+  <!-- 账号安全注销弹窗 -->
+  <view class="login-modal delete-modal" wx:if="{{showDeleteModal}}">
+    <view class="login-card delete-card">
+      <view class="login-card-head">
+        <text class="delete-modal-title">安全注销账号</text>
+        <text class="login-close" bindtap="onHideDeleteModal">✕</text>
+      </view>
+      <view class="delete-warning-box">
+        <text class="delete-warning-text">⚠️ 注销后，您名下的所有启事、上传的照片、会员权益及个人信息将永久物理清除，无法恢复。</text>
+      </view>
+      <view class="delete-phone-tip">
+        为确认是本人操作，请输入发送至 <text class="highlight-phone">{{maskedUserPhone}}</text> 的短信验证码：
+      </view>
+      <view class="verify-code-row">
+        <input class="login-input code-input" type="number" maxlength="6" placeholder="输入6位验证码" value="{{deleteCode}}" bindinput="onDeleteCodeInput" />
+        <button class="btn-send-code {{deleteCountdown > 0 ? 'disabled' : ''}}" bindtap="onSendDeleteSmsCode" disabled="{{deleteCountdown > 0}}">
+          {{deleteCountdown > 0 ? deleteCountdown + 's' : '获取验证码'}}
+        </button>
+      </view>
+      <view class="delete-btn-group">
+        <button class="btn-outline delete-cancel-btn" bindtap="onHideDeleteModal">取消</button>
+        <button class="btn-danger delete-confirm-btn" bindtap="onConfirmDeleteAccount" loading="{{deleteSubmitting}}">确认永久注销</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 隐私授权合规弹窗 -->
+  <privacy-popup></privacy-popup>
 </view>

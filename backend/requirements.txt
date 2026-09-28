@@ -7,4 +7,6 @@ gunicorn==23.0.0
 python-dotenv==1.1.0
 Pillow>=10.0.0
 requests>=2.31.0
+alibabacloud_dysmsapi20170525>=4.6.0
+alibabacloud_tea_openapi>=0.4.6
 

@@ -10,8 +10,10 @@ from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy import func, and_, or_
 from werkzeug.utils import secure_filename
 from PIL import Image
-from models import db, User, Notice, NoticeView
+from models import db, User, Notice, NoticeView, Report, UserBlock
 from services.quota_service import get_membership_limit, get_quota_info
+from utils.file_cleaner import delete_notice_images
+from utils.wechat_security import WeChatSecurity
 
 
 notice_bp = Blueprint('notice', __name__)
@@ -72,33 +74,34 @@ def publish():
     publisher_role = (data.get('publisherRole') or '本人').strip()
 
 
-    # 查找或创建用户
-    user = User.query.filter_by(phone=phone).first()
-    if user:
-        user.name = name
-        user.gender = gender
-        user.occupation = data.get('occupation', '')
-        user.income = data.get('income', '')
-        user.is_public_sector = data.get('isPublicSector', False)
-        user.height = data.get('height', 0) or 0
-        user.weight = data.get('weight', 0) or 0
-        user.updated_at = datetime.utcnow()
-    else:
-        user = User(
-            phone=phone,
-            name=name,
-            gender=gender,
-            occupation=data.get('occupation', ''),
-            income=data.get('income', ''),
-            is_public_sector=data.get('isPublicSector', False),
-            height=data.get('height', 0) or 0,
-            weight=data.get('weight', 0) or 0,
-            membership_type='free',
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        db.session.add(user)
-        db.session.flush()
+    # 登录鉴权：检查发布者是否已登录
+    req_user_id = request.headers.get('X-User-Id')
+    current_user = None
+    if req_user_id:
+        try:
+            current_user = User.query.get(int(req_user_id))
+        except (ValueError, TypeError):
+            pass
+
+    if not current_user:
+        return jsonify(code=401, msg='请先登录后再发布启事'), 401
+
+    # 微信内容安全机审 (msgSecCheck)：检查启事文本是否违规
+    sec_content = f"{name} {data.get('nickname', '')} {data.get('occupation', '')} {data.get('remark', '')} {housing_location}"
+    is_safe, sec_err = WeChatSecurity.check_text(sec_content, openid=current_user.openid)
+    if not is_safe:
+        return jsonify(code=400, msg=sec_err or '内容包含违规或敏感信息，请修改后重试'), 400
+
+    # 用户存在则更新用户资料
+    user = current_user
+    user.name = name
+    user.gender = gender
+    user.occupation = data.get('occupation', '')
+    user.income = data.get('income', '')
+    user.is_public_sector = data.get('isPublicSector', False)
+    user.height = data.get('height', 0) or 0
+    user.weight = data.get('weight', 0) or 0
+    user.updated_at = datetime.utcnow()
 
     # 一个手机号可发布多条启事，始终新增
     images_input = data.get('images', [])
@@ -154,6 +157,16 @@ def update_notice(notice_id):
         return jsonify(code=404, msg='启事不存在'), 404
 
     data = request.get_json() or {}
+
+    # 微信内容安全机审 (msgSecCheck)：检查启事文本是否违规
+    check_name = (data.get('name') or notice.name or '').strip()
+    check_nick = (data.get('nickname') or notice.nickname or '').strip()
+    check_occ = (data.get('occupation') or notice.occupation or '').strip()
+    check_remark = (data.get('remark') or notice.remark or '').strip()
+    sec_content = f"{check_name} {check_nick} {check_occ} {check_remark}"
+    is_safe, sec_err = WeChatSecurity.check_text(sec_content)
+    if not is_safe:
+        return jsonify(code=400, msg=sec_err or '修改内容包含违规或敏感信息，请修改后重试'), 400
     if 'publisherRole' in data:
         notice.publisher_role = (data.get('publisherRole') or '本人').strip()
     notice.name = (data.get('name') or '').strip()
@@ -303,6 +316,18 @@ def upload_image():
         # 压缩并保存图片到本地 uploads 目录，目标大小约 120KB
         _compress_and_save_image(f, filepath, target_kb=120)
 
+        # 微信图片安全审查 (imgSecCheck)
+        try:
+            with open(filepath, 'rb') as img_f:
+                img_bytes = img_f.read()
+            is_safe, sec_err = WeChatSecurity.check_image(img_bytes)
+            if not is_safe:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                return jsonify(code=400, msg=sec_err or '图片包含违规或敏感内容，请重新选择'), 400
+        except Exception as e:
+            current_app.logger.warning(f"图片安全检查异常跳过: {e}")
+
         file_url = f"/uploads/{unique_name}"
         saved_urls.append(file_url)
 
@@ -367,6 +392,16 @@ def get_notices():
             q = q.filter(Notice.occupation.like(f'%{occupation}%'))
         return q
 
+    # 获取已拉黑与被拉黑用户 ID 列表
+    blocked_user_ids = []
+    if user:
+        # 当前用户拉黑的人
+        my_blocks = UserBlock.query.filter_by(user_id=user.id).all()
+        blocked_user_ids.extend([b.blocked_user_id for b in my_blocks])
+        # 拉黑当前用户的人
+        reverse_blocks = UserBlock.query.filter_by(blocked_user_id=user.id).all()
+        blocked_user_ids.extend([b.user_id for b in reverse_blocks])
+
     # 1. 未登录访客逻辑：直接返回最新的公开启事列表供浏览
     if not user:
         nq = Notice.query.order_by(Notice.created_at.desc())
@@ -402,7 +437,7 @@ def get_notices():
     assigned_ids = [v.notice_id for v in assigned_views]
     assigned_count = len(assigned_ids)
 
-    # 2. 如果已分配数量小于当前会员等级对应的周期额度（如升级了会员，或者新周期尚未分配），补充分配差额
+    # 2. 如果已分配数量小于当前会员等级对应的周期额度，补充分配差额
     needed_count = period_limit - assigned_count
     if needed_count > 0:
         # 排除历史上所有已为该用户分配过的启事
@@ -411,6 +446,8 @@ def get_notices():
         query = Notice.query.filter(Notice.user_id != user.id)
         if all_assigned_ids:
             query = query.filter(Notice.id.notin_(all_assigned_ids))
+        if blocked_user_ids:
+            query = query.filter(Notice.user_id.notin_(blocked_user_ids))
         query = _apply_filters(query)
 
         total_available = query.count()
@@ -433,6 +470,8 @@ def get_notices():
         })
 
     nq = Notice.query.filter(Notice.id.in_(assigned_ids))
+    if blocked_user_ids:
+        nq = nq.filter(Notice.user_id.notin_(blocked_user_ids))
     nq = _apply_filters(nq)
 
     notices = nq.all()
@@ -536,6 +575,9 @@ def delete_notice(notice_id):
 
     # 先删除关联的浏览记录
     NoticeView.query.filter_by(notice_id=notice_id).delete()
+    # 清除启事上传在本地磁盘的图片
+    if notice.images:
+        delete_notice_images(notice.images)
     # 再删除启事本身
     db.session.delete(notice)
     db.session.commit()
@@ -543,3 +585,43 @@ def delete_notice(notice_id):
     return jsonify(code=0, msg='删除成功', data={
         'noticeId': str(notice_id)
     })
+
+
+@notice_bp.route('/report', methods=['POST'])
+def report_notice():
+    """UGC 内容举报接口（审核合规刚需）"""
+    user_id = request.headers.get('X-User-Id')
+    if not user_id:
+        return jsonify(code=401, msg='请先登录后再提交举报'), 401
+
+    user = User.query.get(int(user_id))
+    if not user:
+        return jsonify(code=401, msg='用户不存在'), 401
+
+    data = request.get_json() or {}
+    notice_id = data.get('noticeId')
+    reason = (data.get('reason') or '').strip()
+    description = (data.get('description') or '').strip()
+
+    if not notice_id:
+        return jsonify(code=400, msg='请选择要举报的启事'), 400
+    if not reason:
+        return jsonify(code=400, msg='请选择举报原因'), 400
+
+    notice = Notice.query.get(int(notice_id))
+    if not notice:
+        return jsonify(code=404, msg='举报的启事不存在或已被下架'), 404
+
+    # 创建举报记录
+    report = Report(
+        reporter_id=user.id,
+        notice_id=notice.id,
+        reason=reason,
+        description=description[:500],
+        status='pending'
+    )
+    db.session.add(report)
+    db.session.commit()
+
+    return jsonify(code=0, msg='举报已收到，平台将在24小时内严格审核处理')
+

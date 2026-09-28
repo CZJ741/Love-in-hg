@@ -4,6 +4,7 @@ from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from config import Config
 from models.database import db
+import models  # 导入全部数据模型以保证 create_all 生效
 
 
 def create_app():
@@ -48,6 +49,12 @@ def create_app():
     def uploaded_file(filename):
         upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads'))
         return send_from_directory(upload_folder, filename)
+
+    # 移动端独立网页会员开通收银台
+    @app.route('/pay')
+    def pay_page():
+        static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+        return send_from_directory(static_folder, 'pay.html')
 
 
     # 初始化数据库

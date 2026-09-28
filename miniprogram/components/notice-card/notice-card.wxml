@@ -6,9 +6,9 @@
   <!-- 头部区域：姓名 + 身份徽章 -->
   <view class="card-head">
     <view class="head-user">
-      <!-- 姓名：未登录做高斯模糊处理 -->
-      <view class="name-box {{!isLoggedIn ? 'blur-content' : ''}}">
-        <text class="user-name">{{notice.name}}</text>
+      <!-- 姓名：访客模式下隐藏姓氏直接显示（如*子杰） -->
+      <view class="name-box">
+        <text class="user-name">{{displayName || notice.name}}</text>
       </view>
       <!-- 性别与年龄精致组合标 -->
       <view class="gender-age-tag {{notice.gender === '男' ? 'tag-male' : 'tag-female'}}">
@@ -80,8 +80,7 @@
   <!-- 个人备注与择偶要求 -->
   <view class="card-quote" wx:if="{{notice.remark}}">
     <view class="quote-header">
-      <text class="quote-icon">❝</text>
-      <text class="quote-title">个人心语 · 择偶要求</text>
+
     </view>
     <text class="quote-text">{{notice.remark}}</text>
   </view>
@@ -92,11 +91,11 @@
     <text class="phone-number">{{notice.phone}}</text>
   </view>
 
-  <!-- 底部操作按钮栏：仅放置一个查看详情按钮 -->
+  <!-- 底部操作按钮栏：仅放置一个更多信息按钮 -->
   <view class="card-footer-action">
     <button class="btn-action-pill btn-view-detail" catchtap="onViewDetail">
       <text class="action-icon">📋</text>
-      <text>查看详情</text>
+      <text>更多信息</text>
     </button>
   </view>
 </view>

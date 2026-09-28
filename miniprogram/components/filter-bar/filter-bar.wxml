@@ -40,10 +40,8 @@
   <view class="advanced-panel" wx:if="{{expanded}}">
     <view class="panel-header">
       <view class="panel-title-left">
-        <text class="panel-title">选填进阶筛选</text>
         <text class="vip-tag">👑 会员专享</text>
       </view>
-      <text class="vip-tip" wx:if="{{membershipType !== 'member' && membershipType !== 'vip'}}">升级会员解锁精准筛选</text>
     </view>
 
     <!-- 身高 -->
@@ -99,8 +97,8 @@
 
     <!-- 面板底部操作栏 -->
     <view class="panel-bottom-actions">
-      <view class="btn-panel-reset" bindtap="onReset">重置筛选</view>
-      <view class="btn-panel-confirm" bindtap="onConfirm">确认应用</view>
+      <view class="btn-panel-reset" bindtap="onReset">重置</view>
+      <view class="btn-panel-confirm" bindtap="onConfirm">应用</view>
     </view>
   </view>
 </view>

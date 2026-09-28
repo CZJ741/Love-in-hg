@@ -4,3 +4,6 @@ from .user import User
 from .notice import Notice
 from .notice_view import NoticeView
 from .membership_order import MembershipOrder
+from .report import Report
+from .user_block import UserBlock
+

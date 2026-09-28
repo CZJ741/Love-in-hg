@@ -87,4 +87,15 @@ class Config:
     WX_PAY_NOTIFY_URL = os.getenv('WX_PAY_NOTIFY_URL', 'https://love.yourdomain.com/api/membership/notify') # 支付成功异步回调公网地址
     WX_PAY_MOCK_ENABLED = os.getenv('WX_PAY_MOCK_ENABLED', 'false').lower() in ('true', '1', 'yes') # 是否启用模拟支付兜底
 
+    # 阿里云短信配置
+    ALIYUN_ACCESS_KEY_ID = os.getenv('ALIYUN_ACCESS_KEY_ID', '')
+    ALIYUN_ACCESS_KEY_SECRET = os.getenv('ALIYUN_ACCESS_KEY_SECRET', '')
+    ALIYUN_SMS_SIGN_NAME = os.getenv('ALIYUN_SMS_SIGN_NAME', '')
+    ALIYUN_SMS_TEMPLATE_CODE = os.getenv('ALIYUN_SMS_TEMPLATE_CODE', '')
+
+    # 管理员后台配置
+    ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+    ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', os.getenv('INIT_DATA_PASSWORD', 'admin123456'))
+    ADMIN_TOKEN_SECRET = os.getenv('ADMIN_TOKEN_SECRET', 'love-in-hg-admin-token-secret-2026')
+
 

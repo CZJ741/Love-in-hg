@@ -6,7 +6,8 @@ import string
 import time
 import uuid
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from urllib.parse import quote
+from flask import Blueprint, request, jsonify, current_app
 from models import db, User, MembershipOrder
 from config import Config
 from utils.wechat_pay import wechat_pay
@@ -148,6 +149,134 @@ def purchase():
         'typeLabel': type_labels.get(member_type, member_type),
         'isMock': is_mock,
         'payment': payment_params
+    })
+
+
+@membership_bp.route('/config', methods=['GET'])
+def get_membership_config():
+    """获取会员体系配置与价格说明（供 H5 移动网页动态展示）"""
+    return jsonify(code=0, msg='获取成功', data={
+        'prices': Config.MEMBERSHIP_PRICES,
+        'limits': Config.MEMBERSHIP_LIMITS,
+        'tiers': [
+            {
+                'type': 'member',
+                'name': '会员',
+                'price': Config.MEMBERSHIP_PRICES.get('member', 0.01),
+                'duration': '1年 (365天)',
+                'quotaDesc': '每月 30 条相亲启事配额',
+                'badge': '限时优惠'
+            },
+            {
+                'type': 'vip',
+                'name': '大会员',
+                'price': Config.MEMBERSHIP_PRICES.get('vip', 0.02),
+                'duration': '1年 (365天)',
+                'quotaDesc': '每天 30 条相亲启事配额（海量浏览）',
+                'badge': '最受欢迎'
+            }
+        ]
+    })
+
+
+@membership_bp.route('/h5-purchase', methods=['POST'])
+def h5_purchase():
+    """
+    移动端独立网页 H5 创建订单并统一下单
+    支持：手机浏览器拉起微信支付 (WeChat H5 Pay) 或开发环境 Mock 支付
+    """
+    data = request.get_json() or {}
+    member_type = data.get('type', '').strip()
+    phone = (data.get('phone') or '').strip()
+    user_id = data.get('userId') or request.headers.get('X-User-Id')
+    redirect_url = (data.get('redirectUrl') or '').strip()
+
+    if member_type not in Config.MEMBERSHIP_PRICES:
+        return jsonify(code=400, msg='无效的会员类型'), 400
+
+    user = None
+    if user_id:
+        try:
+            user = User.query.get(int(user_id))
+        except (ValueError, TypeError):
+            pass
+    elif phone:
+        user = User.query.filter_by(phone=phone).first()
+
+    if not user:
+        return jsonify(code=401, msg='请先输入手机号登录或验证身份'), 401
+
+    amount = Config.MEMBERSHIP_PRICES[member_type]
+    order = MembershipOrder(
+        order_no=generate_order_no(),
+        user_id=user.id,
+        type=member_type,
+        amount=int(round(amount * 100)),
+        status='pending'
+    )
+    db.session.add(order)
+    db.session.commit()
+
+    type_labels = {'member': '会员', 'vip': '大会员'}
+    desc = f"相亲角-开通{type_labels.get(member_type, '会员')}"
+
+    # 获取客户端公网 IP (微信 H5 支付必须参数)
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip and ',' in client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+
+    use_real_pay = wechat_pay.is_configured() and not Config.WX_PAY_MOCK_ENABLED
+
+    if use_real_pay:
+        try:
+            total_cents = int(round(amount * 100))
+            h5_res = wechat_pay.h5_order(
+                out_trade_no=order.order_no,
+                total_amount_cents=total_cents,
+                description=desc,
+                client_ip=client_ip
+            )
+            raw_h5_url = h5_res.get('h5_url')
+            if not raw_h5_url:
+                raise Exception(f"微信返回无 h5_url: {h5_res}")
+
+            final_h5_url = raw_h5_url
+            if redirect_url:
+                final_h5_url = f"{raw_h5_url}&redirect_url={quote(redirect_url, safe='')}"
+
+            return jsonify(code=0, msg='下单成功', data={
+                'orderId': str(order.id),
+                'orderNo': order.order_no,
+                'amount': amount,
+                'type': member_type,
+                'payType': 'wechat_h5',
+                'h5Url': final_h5_url,
+                'isMock': False
+            })
+        except Exception as e:
+            logger.error(f"微信支付 H5 统一下单失败: {e}")
+            err_str = str(e)
+            # 若商户后台暂未在产品中心勾选开通 H5 支付权限 (NO_AUTH)，或者测试环境下，自动优雅降级为 Mock 模式，确保业务闭环
+            if 'NO_AUTH' in err_str or '商户号该产品权限未开通' in err_str or current_app.config.get('TESTING'):
+                logger.warning("商户号尚未开通 H5 支付权限，已自动降级为测试支付模式")
+                return jsonify(code=0, msg='商户H5支付权限审核中，当前已切入测试模式', data={
+                    'orderId': str(order.id),
+                    'orderNo': order.order_no,
+                    'amount': amount,
+                    'type': member_type,
+                    'payType': 'mock',
+                    'isMock': True
+                })
+            return jsonify(code=500, msg=f'拉起微信支付失败: {err_str}'), 500
+
+    # 兜底与 Mock 体验模式
+    return jsonify(code=0, msg='下单成功(体验模式)', data={
+        'orderId': str(order.id),
+        'orderNo': order.order_no,
+        'amount': amount,
+        'type': member_type,
+        'payType': 'mock',
+        'isMock': True
     })
 
 

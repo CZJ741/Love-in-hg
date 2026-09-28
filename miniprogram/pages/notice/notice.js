@@ -6,6 +6,13 @@ Page({
     isLoggedIn: false,
     loginPhone: '',
     loggingIn: false,
+    authMode: 'login', // 'login' (老用户登录) | 'register' (新用户验证)
+
+    // 新用户验证码相关
+    regPhone: '',
+    regCode: '',
+    countdown: 0,
+    verifying: false,
 
     // 配额
     remaining: 0,
@@ -41,8 +48,19 @@ Page({
     detailNotice: null,
     detailLoading: false,
 
+    // 是否已触发上拉触底（触底后才展示开通VIP获取更多启事提示）
+    hasReachedBottom: false,
+
     // 登录弹窗
-    showLoginModal: false
+    showLoginModal: false,
+
+    // UGC 举报弹窗
+    showReportModal: false,
+    reportNoticeId: null,
+    reportReasons: ['涉黄低俗', '虚假诈骗', '广告骚扰', '侵犯隐私', '其他'],
+    reportReasonIndex: 0,
+    reportDescription: '',
+    reportSubmitting: false
   },
 
   onLoad() {
@@ -69,7 +87,7 @@ Page({
   },
 
   onOpenLoginModal() {
-    this.setData({ showLoginModal: true });
+    this.setData({ showLoginModal: true, authMode: 'login' });
   },
 
   onCloseLoginModal() {
@@ -77,8 +95,14 @@ Page({
   },
 
   onRequireLogin(e) {
-    wx.showToast({ title: '登录后可查看启事详细信息', icon: 'none' });
-    this.setData({ showLoginModal: true });
+    this.setData({ showLoginModal: true, authMode: 'login' });
+  },
+
+  onSwitchAuthMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    if (mode && mode !== this.data.authMode) {
+      this.setData({ authMode: mode });
+    }
   },
 
   // 初始化
@@ -110,7 +134,10 @@ Page({
   },
 
   // 加载随机分配的启事
-  async loadAssignedNotices() {
+  async loadAssignedNotices(showLoading = false) {
+    if (showLoading) {
+      wx.showLoading({ title: '加载中...', mask: true });
+    }
     this.setData({ loading: true });
     try {
       const res = await api.getNotices(this.data.filter);
@@ -127,8 +154,12 @@ Page({
       }
     } catch (err) {
       console.error('加载启事失败:', err);
+    } finally {
+      if (showLoading) {
+        wx.hideLoading();
+      }
+      this.setData({ loading: false });
     }
-    this.setData({ loading: false });
   },
 
   // 加载我的启事
@@ -210,6 +241,101 @@ Page({
     this.setData({ loginPhone: e.detail.value });
   },
 
+  onRegPhoneInput(e) {
+    this.setData({ regPhone: e.detail.value });
+  },
+
+  onRegCodeInput(e) {
+    this.setData({ regCode: e.detail.value });
+  },
+
+  // 发送短信验证码
+  async onSendSmsCode() {
+    if (this.data.countdown > 0) return;
+
+    const phone = (this.data.regPhone || '').trim();
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '发送中...', mask: true });
+    try {
+      const res = await api.sendSms(phone);
+      wx.hideLoading();
+      if (res.code === 0) {
+        wx.showToast({ title: '验证码已发送', icon: 'success' });
+        this.setData({ countdown: 60 });
+        this.smsTimer = setInterval(() => {
+          if (this.data.countdown <= 1) {
+            clearInterval(this.smsTimer);
+            this.setData({ countdown: 0 });
+          } else {
+            this.setData({ countdown: this.data.countdown - 1 });
+          }
+        }, 1000);
+      } else {
+        wx.showToast({ title: res.msg || '发送失败', icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: '网络异常，发送失败', icon: 'none' });
+    }
+  },
+
+  // 新用户验证码核验并登录
+  async onVerifyRegister() {
+    const phone = (this.data.regPhone || '').trim();
+    const code = (this.data.regCode || '').trim();
+
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
+      return;
+    }
+    if (!code || code.length < 4) {
+      wx.showToast({ title: '请输入有效验证码', icon: 'none' });
+      return;
+    }
+
+    this.setData({ verifying: true });
+    wx.showLoading({ title: '验证中...', mask: true });
+
+    try {
+      let wxCode = '';
+      try {
+        const loginRes = await new Promise((resolve) => wx.login({ success: resolve, fail: () => resolve({}) }));
+        wxCode = loginRes.code || '';
+      } catch (e) {}
+
+      const res = await api.verifyRegister(phone, code, wxCode);
+      wx.hideLoading();
+
+      if (res.code === 0 && res.data && res.data.user) {
+        const u = res.data.user;
+        wx.setStorageSync('userInfo', u);
+        wx.setStorageSync('userId', String(u.id));
+        this.setData({
+          isLoggedIn: true,
+          showLoginModal: false,
+          regPhone: '',
+          regCode: ''
+        });
+        if (this.smsTimer) {
+          clearInterval(this.smsTimer);
+          this.setData({ countdown: 0 });
+        }
+        this.initData();
+        wx.showToast({ title: '注册成功', icon: 'success' });
+      } else {
+        wx.showToast({ title: res.msg || '验证失败', icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: '验证失败，请重试', icon: 'none' });
+    }
+    this.setData({ verifying: false });
+  },
+
   async onLogin() {
     const phone = this.data.loginPhone.trim();
     if (!/^1[3-9]\d{9}$/.test(phone)) {
@@ -218,19 +344,24 @@ Page({
     }
 
     this.setData({ loggingIn: true });
+    wx.showLoading({ title: '登录中...', mask: true });
     try {
-      const res = await api.login(phone);
+      // 获取微信 code 以便首次登录自动绑定 openid
+      let wxCode = '';
+      try {
+        const loginRes = await new Promise((resolve) => wx.login({ success: resolve, fail: () => resolve({}) }));
+        wxCode = loginRes.code || '';
+      } catch (e) {}
+
+      const res = await api.login(phone, wxCode);
+      wx.hideLoading();
       if (res.code === 0) {
         if (res.data.isNewUser) {
-          // 新用户跳转发布页
-          wx.setStorageSync('tempPhone', phone);
+          // 未预留手机号
           wx.showModal({
             title: '提示',
-            content: '您还未注册，请先发布启事',
-            showCancel: false,
-            success: () => {
-              wx.switchTab({ url: '/pages/publish/publish' });
-            }
+            content: '该手机号未预留档案，请点击“注册”进行手机验证注册',
+            showCancel: false
           });
         } else {
           // 登录成功
@@ -248,6 +379,7 @@ Page({
         wx.showToast({ title: res.msg, icon: 'none' });
       }
     } catch (err) {
+      wx.hideLoading();
       wx.showToast({ title: '登录失败', icon: 'none' });
     }
     this.setData({ loggingIn: false });
@@ -255,12 +387,12 @@ Page({
 
   onFilterChange(e) {
     this.setData({ filter: e.detail.filter });
-    this.loadAssignedNotices();
+    this.loadAssignedNotices(true);
   },
 
   onTabSwitch(e) {
     const tab = e.currentTarget.dataset.tab;
-    this.setData({ activeTab: tab });
+    this.setData({ activeTab: tab, hasReachedBottom: false });
     if (tab === 'mine') {
       this.loadMyNotices();
     } else if (tab === 'history') {
@@ -274,7 +406,6 @@ Page({
     if (!notice) return;
 
     if (!this.data.isLoggedIn) {
-      wx.showToast({ title: '登录后可查看启事详细信息', icon: 'none' });
       this.setData({ showLoginModal: true });
       return;
     }
@@ -354,6 +485,106 @@ Page({
     });
   },
 
+  // 打开举报弹窗
+  onOpenReport() {
+    if (!this.data.isLoggedIn) {
+      this.setData({ showLoginModal: true });
+      return;
+    }
+    const notice = this.data.detailNotice;
+    if (!notice) return;
+    this.setData({
+      showReportModal: true,
+      reportNoticeId: notice.id,
+      reportReasonIndex: 0,
+      reportDescription: ''
+    });
+  },
+
+  onCloseReport() {
+    this.setData({
+      showReportModal: false,
+      reportNoticeId: null,
+      reportDescription: ''
+    });
+  },
+
+  onReasonChange(e) {
+    this.setData({ reportReasonIndex: Number(e.detail.value) });
+  },
+
+  onReportDescInput(e) {
+    this.setData({ reportDescription: e.detail.value });
+  },
+
+  async onSubmitReport() {
+    const noticeId = this.data.reportNoticeId;
+    const reason = this.data.reportReasons[this.data.reportReasonIndex];
+    const description = this.data.reportDescription;
+
+    this.setData({ reportSubmitting: true });
+    try {
+      const res = await api.reportNotice({ noticeId, reason, description });
+      this.setData({ reportSubmitting: false, showReportModal: false });
+      if (res.code === 0) {
+        wx.showToast({ title: '举报已提交，核实中', icon: 'success' });
+      } else {
+        wx.showToast({ title: res.msg || '举报失败', icon: 'none' });
+      }
+    } catch (e) {
+      this.setData({ reportSubmitting: false });
+      wx.showToast({ title: '网络异常，请重试', icon: 'none' });
+    }
+  },
+
+  // 屏蔽/拉黑该用户
+  onBlockUser() {
+    if (!this.data.isLoggedIn) {
+      this.setData({ showLoginModal: true });
+      return;
+    }
+    const notice = this.data.detailNotice;
+    if (!notice) return;
+
+    wx.showModal({
+      title: '屏蔽确认',
+      content: '确定要屏蔽该用户吗？屏蔽后系统将不再向您推荐该用户发布的相亲启事。',
+      confirmText: '确定屏蔽',
+      confirmColor: '#e74c3c',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '处理中...' });
+        try {
+          const blockRes = await api.blockUser({ targetUserId: notice.userId, noticeId: notice.id });
+          wx.hideLoading();
+          if (blockRes.code === 0) {
+            wx.showToast({ title: '已屏蔽该用户', icon: 'success' });
+            // 从当前列表中移除
+            this.removeNoticeFromFeed(notice.id);
+            this.onCloseDetailModal();
+          } else {
+            wx.showToast({ title: blockRes.msg || '屏蔽失败', icon: 'none' });
+          }
+        } catch (e) {
+          wx.hideLoading();
+          wx.showToast({ title: '操作失败，请稍后重试', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  removeNoticeFromFeed(noticeId) {
+    const filterFn = (item) => String(item.id) !== String(noticeId);
+    this.setData({
+      assignedNotices: this.data.assignedNotices.filter(filterFn),
+      assignedLeft: this.data.assignedLeft.filter(filterFn),
+      assignedRight: this.data.assignedRight.filter(filterFn),
+      historyNotices: this.data.historyNotices.filter(filterFn),
+      historyLeft: this.data.historyLeft.filter(filterFn),
+      historyRight: this.data.historyRight.filter(filterFn)
+    });
+  },
+
   onGoPublish() {
     wx.switchTab({ url: '/pages/publish/publish' });
   },
@@ -362,12 +593,26 @@ Page({
     wx.switchTab({ url: '/pages/my/my' });
   },
 
+  onUnload() {
+    if (this.smsTimer) {
+      clearInterval(this.smsTimer);
+    }
+  },
+
+  // 上拉触底/加载更多
+  onReachBottom() {
+    if (!this.data.hasReachedBottom) {
+      this.setData({ hasReachedBottom: true });
+    }
+  },
+
   // 下拉刷新
   async onPullDownRefresh() {
-    if (this.data.isLoggedIn) {
-      if (this.data.activeTab === 'assigned') {
-        await this.initData();
-      } else if (this.data.activeTab === 'mine') {
+    this.setData({ hasReachedBottom: false });
+    if (this.data.activeTab === 'assigned') {
+      await this.initData();
+    } else if (this.data.isLoggedIn) {
+      if (this.data.activeTab === 'mine') {
         await this.loadMyNotices();
       } else if (this.data.activeTab === 'history') {
         await this.loadHistoryNotices();

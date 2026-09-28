@@ -1,4 +1,9 @@
 {
+  "__usePrivacyCheck__": true,
+  "lazyCodeLoading": "requiredComponents",
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup"
+  },
   "pages": [
     "pages/notice/notice",
     "pages/publish/publish",

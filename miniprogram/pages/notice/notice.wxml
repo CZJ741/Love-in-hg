@@ -4,21 +4,40 @@
   <view class="unlogin-banner" wx:if="{{!isLoggedIn}}" bindtap="onOpenLoginModal">
     <view class="banner-left">
       <text class="banner-icon">🔒</text>
-      <text class="banner-text">您当前处于访客模式，登录后解锁全部照片与联系方式</text>
+      <text class="banner-text">登录解锁更多内容</text>
     </view>
     <text class="banner-btn">去登录</text>
   </view>
 
-  <!-- 登录弹窗（仅在需要登录时按需弹出，不再全屏阻断） -->
+  <!-- 登录/验证弹窗 -->
   <view class="login-modal" wx:if="{{showLoginModal}}" bindtap="onCloseLoginModal">
     <view class="login-card" catchtap="stopBubble">
       <view class="login-card-head">
-        <text class="login-title">登录相亲角</text>
+        <!-- 简洁 Tab 切换：登录 / 注册 -->
+        <view class="auth-tabs">
+          <view class="auth-tab {{authMode === 'login' ? 'active' : ''}}" data-mode="login" bindtap="onSwitchAuthMode">登录</view>
+          <view class="auth-tab {{authMode === 'register' ? 'active' : ''}}" data-mode="register" bindtap="onSwitchAuthMode">注册</view>
+        </view>
         <text class="login-close" bindtap="onCloseLoginModal">✕</text>
       </view>
-      <view class="login-desc">登录后可查看完整姓名、清晰照片与联系方式</view>
-      <input class="login-input" type="number" maxlength="11" placeholder="请输入手机号码" value="{{loginPhone}}" bindinput="onPhoneInput" />
-      <button class="btn-primary login-btn" bindtap="onLogin" loading="{{loggingIn}}">立即登录</button>
+
+      <!-- 1. 登录：手机号直登 -->
+      <view class="auth-panel" wx:if="{{authMode === 'login'}}">
+        <input class="login-input" type="number" maxlength="11" placeholder="输入手机号" value="{{loginPhone}}" bindinput="onPhoneInput" />
+        <button class="btn-primary login-btn" bindtap="onLogin" loading="{{loggingIn}}">登录</button>
+      </view>
+
+      <!-- 2. 注册：手机号验证码认证 -->
+      <view class="auth-panel" wx:if="{{authMode === 'register'}}">
+        <input class="login-input" type="number" maxlength="11" placeholder="输入手机号" value="{{regPhone}}" bindinput="onRegPhoneInput" />
+        <view class="verify-code-row">
+          <input class="login-input code-input" type="number" maxlength="6" placeholder="输入验证码" value="{{regCode}}" bindinput="onRegCodeInput" />
+          <button class="btn-send-code {{countdown > 0 ? 'disabled' : ''}}" bindtap="onSendSmsCode" disabled="{{countdown > 0}}">
+            {{countdown > 0 ? countdown + 's' : '获取验证码'}}
+          </button>
+        </view>
+        <button class="btn-primary login-btn" bindtap="onVerifyRegister" loading="{{verifying}}">注册</button>
+      </view>
     </view>
   </view>
 
@@ -65,6 +84,12 @@
           />
         </view>
       </view>
+
+      <!-- 底部上拉触底提示（推荐列表上拉触底后才显示） -->
+      <view class="vip-footer-tip" wx:if="{{assignedNotices.length > 0 && hasReachedBottom}}">
+        <text class="vip-icon">✨</text>
+        <text class="vip-text">开通vip权益获取更多启事</text>
+      </view>
     </block>
 
     <!-- 我的启事 -->
@@ -72,7 +97,7 @@
       <view wx:if="{{!isLoggedIn}}" class="empty-state">
         <text class="icon">🔒</text>
         <text>请先登录查看您的启事</text>
-        <button class="btn-primary" style="margin-top:20rpx;padding:12rpx 36rpx;font-size:26rpx;width:auto;" bindtap="onOpenLoginModal">立即登录</button>
+        <button class="btn-primary" style="margin-top:20rpx;padding:12rpx 36rpx;font-size:26rpx;width:auto;" bindtap="onOpenLoginModal">登录</button>
       </view>
       <view wx:elif="{{myNotices.length === 0 && !loadingMy}}" class="empty-state">
         <text class="icon">📝</text>
@@ -110,7 +135,7 @@
       <view wx:if="{{!isLoggedIn}}" class="empty-state">
         <text class="icon">🔒</text>
         <text>请先登录查看历史记录</text>
-        <button class="btn-primary" style="margin-top:20rpx;padding:12rpx 36rpx;font-size:26rpx;width:auto;" bindtap="onOpenLoginModal">立即登录</button>
+        <button class="btn-primary" style="margin-top:20rpx;padding:12rpx 36rpx;font-size:26rpx;width:auto;" bindtap="onOpenLoginModal">登录</button>
       </view>
       <view wx:elif="{{historyNotices.length === 0 && !loadingHistory}}" class="empty-state">
         <text class="icon">🕐</text>
@@ -212,7 +237,7 @@
 
         <!-- 个人备注 -->
         <view class="detail-section" wx:if="{{detailNotice.remark}}">
-          <text class="section-sub-title">个人心语 · 择偶要求</text>
+          <text class="section-sub-title"></text>
           <view class="detail-remark-box">
             <text class="remark-content">{{detailNotice.remark}}</text>
           </view>
@@ -246,7 +271,49 @@
             </view>
           </view>
         </view>
+
+        <!-- UGC 维权操作区：举报与屏蔽拉黑（审核刚需） -->
+        <view class="detail-ugc-actions">
+          <view class="ugc-btn" bindtap="onOpenReport">
+            <text class="ugc-icon">🚨</text>
+            <text class="ugc-text">举报违规</text>
+          </view>
+          <view class="ugc-split">|</view>
+          <view class="ugc-btn" bindtap="onBlockUser">
+            <text class="ugc-icon">🚫</text>
+            <text class="ugc-text">屏蔽此人</text>
+          </view>
+        </view>
       </scroll-view>
     </view>
   </view>
+
+  <!-- UGC 举报弹窗 -->
+  <view class="login-modal" wx:if="{{showReportModal}}">
+    <view class="login-card report-card">
+      <view class="login-card-head">
+        <text class="modal-title">举报违规信息</text>
+        <text class="login-close" bindtap="onCloseReport">✕</text>
+      </view>
+      <view class="report-tip">为了共同维护健康真实的相亲交友环境，请选择举报类型：</view>
+      <picker mode="selector" range="{{reportReasons}}" value="{{reportReasonIndex}}" bindchange="onReasonChange">
+        <view class="report-picker-trigger">
+          <text class="picker-label">违规类型：</text>
+          <text class="picker-val">{{reportReasons[reportReasonIndex]}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+      <textarea
+        class="report-textarea"
+        placeholder="请补充详细描述（可选，限200字）"
+        maxlength="200"
+        value="{{reportDescription}}"
+        bindinput="onReportDescInput"
+      />
+      <button class="btn-primary report-submit-btn" bindtap="onSubmitReport" loading="{{reportSubmitting}}">提交举报</button>
+    </view>
+  </view>
+
+  <!-- 隐私授权合规弹窗 -->
+  <privacy-popup></privacy-popup>
 </view>

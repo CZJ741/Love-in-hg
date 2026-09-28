@@ -5,6 +5,7 @@ Page({
   data: {
     user: {},
     userInitial: '?',
+    maskedUserPhone: '',
     membershipType: 'free',
     membershipName: '普通用户',
     membershipExpire: '',
@@ -15,7 +16,29 @@ Page({
     periodLabel: '本月配额',
     prices: { member: 0.01, vip: 0.02 },
     showLoginModal: false,
-    loginPhone: ''
+    loginPhone: '',
+    authMode: 'login', // 'login' | 'register'
+    regPhone: '',
+    regCode: '',
+    countdown: 0,
+    verifying: false,
+    // 注销弹窗相关
+    showDeleteModal: false,
+    deleteCode: '',
+    deleteCountdown: 0,
+    deleteSubmitting: false,
+    // 平台检测
+    isIOS: false
+  },
+
+  onLoad() {
+    try {
+      const sys = wx.getSystemInfoSync();
+      const isIOS = (sys.platform === 'ios');
+      this.setData({ isIOS });
+    } catch (e) {
+      console.warn('获取系统平台信息失败:', e);
+    }
   },
 
   onShow() {
@@ -47,9 +70,17 @@ Page({
           expireStr = expireStr.split('T')[0].split(' ')[0];
         }
 
+        let maskedPhone = '';
+        if (user.phone && user.phone.length === 11) {
+          maskedPhone = user.phone.slice(0, 3) + '****' + user.phone.slice(7);
+        }
+
+        const initialChar = user.name ? user.name[0] : (user.phone ? user.phone.slice(-2) : '?');
+
         this.setData({
           user,
-          userInitial: (user.name || '?')[0],
+          userInitial: initialChar,
+          maskedUserPhone: maskedPhone,
           membershipType: quota.membershipType,
           membershipName: memberNames[quota.membershipType] || '普通用户',
           membershipExpire: expireStr,
@@ -67,15 +98,118 @@ Page({
 
   // 显示手动登录弹窗
   onShowLoginModal() {
-    this.setData({ showLoginModal: true });
+    this.setData({ showLoginModal: true, authMode: 'login' });
   },
 
   onHideLogin() {
     this.setData({ showLoginModal: false });
   },
 
+  onSwitchAuthMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    if (mode && mode !== this.data.authMode) {
+      this.setData({ authMode: mode });
+    }
+  },
+
+  stopBubble() {},
+
   onPhoneInput(e) {
     this.setData({ loginPhone: e.detail.value });
+  },
+
+  onRegPhoneInput(e) {
+    this.setData({ regPhone: e.detail.value });
+  },
+
+  onRegCodeInput(e) {
+    this.setData({ regCode: e.detail.value });
+  },
+
+  // 发送短信验证码
+  async onSendSmsCode() {
+    if (this.data.countdown > 0) return;
+
+    const phone = (this.data.regPhone || '').trim();
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '发送中...', mask: true });
+    try {
+      const res = await api.sendSms(phone);
+      wx.hideLoading();
+      if (res.code === 0) {
+        wx.showToast({ title: '验证码已发送', icon: 'success' });
+        this.setData({ countdown: 60 });
+        this.smsTimer = setInterval(() => {
+          if (this.data.countdown <= 1) {
+            clearInterval(this.smsTimer);
+            this.setData({ countdown: 0 });
+          } else {
+            this.setData({ countdown: this.data.countdown - 1 });
+          }
+        }, 1000);
+      } else {
+        wx.showToast({ title: res.msg || '发送失败', icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: '网络异常，发送失败', icon: 'none' });
+    }
+  },
+
+  // 新用户验证码核验并登录
+  async onVerifyRegister() {
+    const phone = (this.data.regPhone || '').trim();
+    const code = (this.data.regCode || '').trim();
+
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
+      return;
+    }
+    if (!code || code.length < 4) {
+      wx.showToast({ title: '请输入有效验证码', icon: 'none' });
+      return;
+    }
+
+    this.setData({ verifying: true });
+    wx.showLoading({ title: '验证中...', mask: true });
+
+    try {
+      let wxCode = '';
+      try {
+        const loginRes = await new Promise((resolve) => wx.login({ success: resolve, fail: () => resolve({}) }));
+        wxCode = loginRes.code || '';
+      } catch (e) {}
+
+      const res = await api.verifyRegister(phone, code, wxCode);
+      wx.hideLoading();
+
+      if (res.code === 0 && res.data && res.data.user) {
+        const u = res.data.user;
+        wx.setStorageSync('userInfo', u);
+        wx.setStorageSync('userId', String(u.id));
+        this.setData({
+          showLoginModal: false,
+          regPhone: '',
+          regCode: ''
+        });
+        if (this.smsTimer) {
+          clearInterval(this.smsTimer);
+          this.setData({ countdown: 0 });
+        }
+        this.loadUserProfile();
+        wx.showToast({ title: '注册成功', icon: 'success' });
+      } else {
+        wx.showToast({ title: res.msg || '验证失败', icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: '验证失败，请重试', icon: 'none' });
+    }
+    this.setData({ verifying: false });
   },
 
   async onManualLogin() {
@@ -85,16 +219,22 @@ Page({
       return;
     }
 
+    wx.showLoading({ title: '登录中...', mask: true });
     try {
-      const res = await api.login(phone);
+      let wxCode = '';
+      try {
+        const loginRes = await new Promise((resolve) => wx.login({ success: resolve, fail: () => resolve({}) }));
+        wxCode = loginRes.code || '';
+      } catch (e) {}
+
+      const res = await api.login(phone, wxCode);
+      wx.hideLoading();
       if (res.code === 0) {
         if (res.data.isNewUser) {
-          wx.setStorageSync('tempPhone', phone);
           wx.showModal({
             title: '提示',
-            content: '您还未注册，请先发布启事',
-            showCancel: false,
-            success: () => wx.switchTab({ url: '/pages/publish/publish' })
+            content: '该手机号未预留档案，请点击“注册”进行手机验证注册',
+            showCancel: false
           });
         } else {
           const u = res.data.user;
@@ -108,6 +248,7 @@ Page({
         wx.showToast({ title: res.msg, icon: 'none' });
       }
     } catch (err) {
+      wx.hideLoading();
       wx.showToast({ title: '登录失败', icon: 'none' });
     }
   },
@@ -127,7 +268,31 @@ Page({
     }
   },
 
+  // iOS 复制外部专属开通链接
+  onCopyPayLink() {
+    const phone = (this.data.user && this.data.user.phone) || '';
+    const origin = api.BASE_URL.replace(/\/api\/?$/, '');
+    const payUrl = `${origin}/pay${phone ? `?phone=${phone}` : ''}`;
+
+    wx.setClipboardData({
+      data: payUrl,
+      success: () => {
+        wx.showModal({
+          title: '专属开通链接已复制',
+          content: '请在手机自带浏览器（Safari/Chrome）中粘贴打开链接完成支付。支付成功后，同一手机号权益立即全端生效！',
+          confirmText: '我知道了',
+          showCancel: false
+        });
+      }
+    });
+  },
+
   async onBuyMembership(e) {
+    if (this.data.isIOS) {
+      this.onCopyPayLink();
+      return;
+    }
+
     const type = e.currentTarget.dataset.type;
     if (type === this.data.membershipType) {
       wx.showToast({ title: '您已开通该级别会员', icon: 'none' });
@@ -269,6 +434,7 @@ Page({
           this.setData({
             user: {},
             userInitial: '?',
+            maskedUserPhone: '',
             membershipType: 'free'
           });
           wx.showToast({ title: '已退出', icon: 'none' });
@@ -292,58 +458,113 @@ Page({
     wx.navigateTo({ url: '/pages/privacy/privacy' });
   },
 
-  // 注销账号（双重确认）
+  // 点击注销账号，直接打开安全验证弹窗
   onDeleteAccount() {
-    wx.showModal({
-      title: '注销账号',
-      content: '注销后，您的全部启事和个人信息将被永久删除，且无法恢复。确定继续吗？',
-      confirmText: '继续注销',
-      confirmColor: '#e74c3c',
-      success: (res) => {
-        if (res.confirm) {
-          this.confirmDeleteAccount();
-        }
-      }
+    const user = this.data.user || {};
+    if (!user.phone) {
+      wx.showToast({ title: '未获取到手机号', icon: 'none' });
+      return;
+    }
+    this.setData({
+      showDeleteModal: true,
+      deleteCode: ''
     });
   },
 
-  async confirmDeleteAccount() {
-    // 需要用户输入手机号验证身份（防止误操作）
-    wx.showModal({
-      title: '二次确认',
-      content: '为确认是本人操作，请点击"我已确认"完成注销。此操作不可撤销。',
-      confirmText: '我已确认',
-      confirmColor: '#e74c3c',
-      success: async (res) => {
-        if (!res.confirm) return;
-        try {
-          wx.showLoading({ title: '注销中...' });
-          const result = await api.deleteAccount();
-          wx.hideLoading();
-          if (result.code === 0) {
-            // 清除本地全部用户数据
-            wx.removeStorageSync('userInfo');
-            wx.removeStorageSync('userId');
-            wx.removeStorageSync('tempPhone');
-            wx.removeStorageSync('editNoticeData');
-            this.setData({
-              user: {},
-              userInitial: '?',
-              membershipType: 'free',
-              noticeCount: 0,
-              monthlyAssigned: 0,
-              remaining: 0,
-              membershipExpire: ''
-            });
-            wx.showToast({ title: '注销成功', icon: 'success' });
-          } else {
-            wx.showToast({ title: result.msg || '注销失败', icon: 'none' });
-          }
-        } catch (err) {
-          wx.hideLoading();
-          wx.showToast({ title: '注销失败，请重试', icon: 'none' });
-        }
-      }
+  onHideDeleteModal() {
+    this.setData({
+      showDeleteModal: false,
+      deleteCode: ''
     });
+  },
+
+  onDeleteCodeInput(e) {
+    this.setData({ deleteCode: e.detail.value });
+  },
+
+  // 发送注销短信验证码
+  async onSendDeleteSmsCode() {
+    if (this.data.deleteCountdown > 0) return;
+
+    const phone = this.data.user && this.data.user.phone;
+    if (!phone) {
+      wx.showToast({ title: '用户手机号异常', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '发送中...', mask: true });
+    try {
+      const res = await api.sendSms(phone);
+      wx.hideLoading();
+      if (res.code === 0) {
+        wx.showToast({ title: '验证码已发送', icon: 'success' });
+        this.setData({ deleteCountdown: 60 });
+        if (this.deleteSmsTimer) clearInterval(this.deleteSmsTimer);
+        this.deleteSmsTimer = setInterval(() => {
+          if (this.data.deleteCountdown <= 1) {
+            clearInterval(this.deleteSmsTimer);
+            this.setData({ deleteCountdown: 0 });
+          } else {
+            this.setData({ deleteCountdown: this.data.deleteCountdown - 1 });
+          }
+        }, 1000);
+      } else {
+        wx.showToast({ title: res.msg || '发送失败', icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: '网络请求失败，请稍后重试', icon: 'none' });
+    }
+  },
+
+  // 确认注销
+  async onConfirmDeleteAccount() {
+    const code = (this.data.deleteCode || '').trim();
+    if (!code || code.length !== 6) {
+      wx.showToast({ title: '请输入6位有效验证码', icon: 'none' });
+      return;
+    }
+
+    this.setData({ deleteSubmitting: true });
+    try {
+      const result = await api.deleteAccount(code);
+      this.setData({ deleteSubmitting: false });
+      if (result.code === 0) {
+        if (this.deleteSmsTimer) clearInterval(this.deleteSmsTimer);
+        // 清除本地全部用户数据
+        wx.removeStorageSync('userInfo');
+        wx.removeStorageSync('userId');
+        wx.removeStorageSync('tempPhone');
+        wx.removeStorageSync('editNoticeData');
+        this.setData({
+          showDeleteModal: false,
+          deleteCode: '',
+          deleteCountdown: 0,
+          user: {},
+          userInitial: '?',
+          maskedUserPhone: '',
+          membershipType: 'free',
+          noticeCount: 0,
+          monthlyAssigned: 0,
+          remaining: 0,
+          membershipExpire: ''
+        });
+        wx.showToast({ title: '账号已注销', icon: 'success', duration: 2500 });
+      } else {
+        wx.showToast({ title: result.msg || '注销失败', icon: 'none' });
+      }
+    } catch (err) {
+      this.setData({ deleteSubmitting: false });
+      wx.showToast({ title: '注销失败，请重试', icon: 'none' });
+    }
+  },
+
+  onUnload() {
+    if (this.smsTimer) {
+      clearInterval(this.smsTimer);
+    }
+    if (this.deleteSmsTimer) {
+      clearInterval(this.deleteSmsTimer);
+    }
   }
 });

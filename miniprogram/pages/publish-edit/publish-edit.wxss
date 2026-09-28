@@ -1,7 +1,9 @@
 /* pages/publish-edit/publish-edit.wxss */
 .publish-header {
-  text-align: center;
-  padding: 24rpx 20rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 28rpx;
   background: linear-gradient(135deg, #ffffff 0%, #fffbf9 100%);
   border-radius: 18rpx;
   margin-bottom: 20rpx;
@@ -12,8 +14,33 @@
   font-size: 34rpx;
   font-weight: 700;
   color: #222;
-  display: block;
   letter-spacing: 2rpx;
+}
+
+.draft-action {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.btn-draft-save {
+  font-size: 24rpx;
+  color: #e74c3c;
+  background: #fdf2f2;
+  border: 1rpx solid #fecaca;
+  padding: 8rpx 20rpx;
+  border-radius: 30rpx;
+  font-weight: 500;
+}
+
+.btn-draft-save:active {
+  background: #fee2e2;
+}
+
+.btn-draft-clear {
+  font-size: 24rpx;
+  color: #94a3b8;
+  padding: 8rpx 12rpx;
 }
 
 

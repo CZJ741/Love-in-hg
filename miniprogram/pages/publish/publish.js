@@ -5,11 +5,26 @@ const api = require('../../utils/api');
 Page({
   data: {
     myNotices: [],
-    loading: false
+    loading: false,
+    isLoggedIn: false
   },
 
   onShow() {
-    this.loadMyNotices();
+    const userInfo = wx.getStorageSync('userInfo');
+    const userId = wx.getStorageSync('userId');
+    const isLoggedIn = !!(userInfo && userId);
+    this.setData({ isLoggedIn });
+
+    if (isLoggedIn) {
+      this.loadMyNotices();
+    } else {
+      this.setData({ myNotices: [], loading: false });
+    }
+  },
+
+  // 引导去登录
+  onGoLogin() {
+    wx.switchTab({ url: '/pages/notice/notice' });
   },
 
   // 预览照片
