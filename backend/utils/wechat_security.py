@@ -108,7 +108,7 @@ class WeChatSecurity:
             return True, ""
 
         url = f"https://api.weixin.qq.com/wxa/img_sec_check?access_token={token}"
-        files = {'media': ('image.jpg', image_bytes, 'image/jpeg')}
+        files = {'media': ('image.webp', image_bytes, 'image/webp')}
         try:
             res = requests.post(url, files=files, timeout=10)
             data = res.json()

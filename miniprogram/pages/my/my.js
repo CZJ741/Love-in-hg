@@ -278,8 +278,8 @@ Page({
       data: payUrl,
       success: () => {
         wx.showModal({
-          title: '专属开通链接已复制',
-          content: '请在手机自带浏览器（Safari/Chrome）中粘贴打开链接完成支付。支付成功后，同一手机号权益立即全端生效！',
+          title: '开通链接已复制',
+          content: '请在手机自带浏览器（Safari/Chrome）中粘贴打开链接完成支付。',
           confirmText: '我知道了',
           showCancel: false
         });

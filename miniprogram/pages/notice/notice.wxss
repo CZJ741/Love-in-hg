@@ -376,8 +376,9 @@
 
 .detail-scroll {
   flex: 1;
+  min-height: 0;
   max-height: 70vh;
-  padding: 24rpx 36rpx 40rpx;
+  padding: 24rpx 36rpx calc(80rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -545,7 +546,7 @@
   align-items: center;
   justify-content: center;
   gap: 32rpx;
-  padding: 30rpx 0 10rpx;
+  padding: 36rpx 0 30rpx;
 }
 
 .ugc-btn {

@@ -139,6 +139,7 @@
             class="photo-thumb"
             src="{{img}}"
             mode="aspectFill"
+            lazy-load="true"
             catchtap="onPreviewPhoto"
             data-src="{{img}}"
             data-urls="{{item.images}}"

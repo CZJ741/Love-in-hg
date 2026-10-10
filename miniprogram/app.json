@@ -1,5 +1,5 @@
 {
-  "__usePrivacyCheck__": true,
+  "__usePrivacyCheck__": false,
   "lazyCodeLoading": "requiredComponents",
   "usingComponents": {
     "privacy-popup": "/components/privacy-popup/privacy-popup"

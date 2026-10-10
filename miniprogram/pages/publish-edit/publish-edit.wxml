@@ -120,7 +120,7 @@
     </view>
     <view class="uploader-grid">
       <view class="uploader-item" wx:for="{{images}}" wx:key="index">
-        <image class="uploader-img" src="{{item}}" mode="aspectFill" bindtap="onPreviewImage" data-current="{{item}}" />
+        <image class="uploader-img" src="{{item}}" mode="aspectFill" lazy-load="true" bindtap="onPreviewImage" data-current="{{item}}" />
         <view class="uploader-delete" catchtap="onDeleteImage" data-index="{{index}}">
           <text class="uploader-delete-icon">×</text>
         </view>
@@ -140,11 +140,11 @@
     <view class="form-row">
       <view class="form-col">
         <text class="form-label">身高 (cm)</text>
-        <input class="form-input" type="number" placeholder="如 175" value="{{form.height}}" bindinput="onFieldChange" data-field="height" />
+        <input class="form-input" type="number" placeholder="" value="{{form.height}}" bindinput="onFieldChange" data-field="height" />
       </view>
       <view class="form-col">
         <text class="form-label">体重 (kg)</text>
-        <input class="form-input" type="number" placeholder="如 65" value="{{form.weight}}" bindinput="onFieldChange" data-field="weight" />
+        <input class="form-input" type="number" placeholder="" value="{{form.weight}}" bindinput="onFieldChange" data-field="weight" />
       </view>
     </view>
 
@@ -152,7 +152,7 @@
     <view class="form-row">
       <view class="form-col">
         <text class="form-label">职业</text>
-        <input class="form-input" placeholder="请输入职业" value="{{form.occupation}}" bindinput="onFieldChange" data-field="occupation" />
+        <input class="form-input" placeholder="" value="{{form.occupation}}" bindinput="onFieldChange" data-field="occupation" />
       </view>
       <view class="form-col">
         <text class="form-label">收入</text>
@@ -173,7 +173,7 @@
           data-value="{{true}}"
         >
           <text class="pill-check" wx:if="{{form.isPublicSector === true}}">✓</text>
-          <text class="pill-text">是（体制内）</text>
+          <text class="pill-text">是</text>
         </view>
         <view
           class="pill-item {{form.isPublicSector === false ? 'pill-active' : ''}}"

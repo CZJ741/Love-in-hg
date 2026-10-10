@@ -11,12 +11,12 @@ Page({
     existingNoticeId: null,
     publisherRoles: ['本人', '父母', '亲戚', '朋友'],
     form: {
-      publisherRole: '本人',
+      publisherRole: '',
       phone: '',
       name: '',
       gender: '',
       age: '',
-      housingLocation: '本地',
+      housingLocation: '',
       occupation: '',
       income: '',
       isPublicSector: undefined,
@@ -66,12 +66,12 @@ Page({
         existingNoticeId: editNotice.id,
         images: Array.isArray(noticeImages) ? noticeImages : [],
         form: {
-          publisherRole: editNotice.publisherRole || '本人',
+          publisherRole: editNotice.publisherRole || '',
           phone: editNotice.phone || currentPhone,
           name: editNotice.name || '',
           gender: editNotice.gender || '',
           age: editNotice.age ? String(editNotice.age) : '',
-          housingLocation: editNotice.housingLocation || '本地',
+          housingLocation: editNotice.housingLocation || '',
           occupation: editNotice.occupation || '',
           income: editNotice.income || '',
           isPublicSector: editNotice.isPublicSector || undefined,
@@ -136,12 +136,12 @@ Page({
           hasDraft: false,
           images: [],
           form: {
-            publisherRole: '本人',
+            publisherRole: '',
             phone: currentPhone,
             name: '',
             gender: '',
             age: '',
-            housingLocation: '本地',
+            housingLocation: '',
             occupation: '',
             income: '',
             isPublicSector: undefined,
@@ -213,39 +213,81 @@ Page({
 
   // 选择并上传图片（最多9张）
   onChooseImages() {
+    console.log('[publish-edit] 点击了上传照片按钮');
     const maxCount = 9 - this.data.images.length;
     if (maxCount <= 0) {
       wx.showToast({ title: '最多支持上传9张图片', icon: 'none' });
       return;
     }
 
-    wx.chooseMedia({
-      count: maxCount,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const tempFilePaths = res.tempFiles.map(file => file.tempFilePath);
-        wx.showLoading({ title: '上传中...' });
-
-        // 调用批量上传接口
-        api.uploadImages(tempFilePaths).then(uploadedUrls => {
-          wx.hideLoading();
-          this.setData({
-            images: [...this.data.images, ...uploadedUrls].slice(0, 9)
-          });
-          wx.showToast({ title: '上传成功', icon: 'success' });
-        }).catch(err => {
-          wx.hideLoading();
-          wx.showToast({ title: err.message || '上传失败', icon: 'none' });
-        });
-      },
-      fail: (err) => {
-        // 用户取消或拒绝权限
-        if (err.errMsg && !err.errMsg.includes('cancel')) {
-          wx.showToast({ title: '选择图片失败', icon: 'none' });
-        }
+    const handleUpload = (tempFilePaths) => {
+      if (!tempFilePaths || tempFilePaths.length === 0) {
+        console.warn('[publish-edit] 未获取到选中的图片文件路径');
+        return;
       }
-    });
+      console.log('[publish-edit] 获取到本地图片文件路径:', tempFilePaths);
+      wx.showLoading({ title: '上传中...', mask: true });
+
+      api.uploadImages(tempFilePaths).then(uploadedUrls => {
+        wx.hideLoading();
+        console.log('[publish-edit] 上传图片成功:', uploadedUrls);
+        this.setData({
+          images: [...this.data.images, ...uploadedUrls].slice(0, 9)
+        });
+        wx.showToast({ title: '上传成功', icon: 'success' });
+      }).catch(err => {
+        wx.hideLoading();
+        console.error('[publish-edit] 上传接口调用失败:', err);
+        wx.showToast({ title: err.message || '上传失败', icon: 'none' });
+      });
+    };
+
+    const handleFail = (err) => {
+      console.warn('[publish-edit] 选择图片失败/取消:', err);
+      if (err && err.errMsg && !err.errMsg.includes('cancel')) {
+        wx.showToast({ title: '选择图片失败: ' + (err.errMsg || ''), icon: 'none' });
+      }
+    };
+
+    // 优先尝试 wx.chooseMedia，若报错或异常则降级到 wx.chooseImage
+    if (wx.chooseMedia) {
+      wx.chooseMedia({
+        count: maxCount,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+        sizeType: ['compressed'],
+        success: (res) => {
+          const tempFilePaths = (res.tempFiles || []).map(file => file.tempFilePath);
+          handleUpload(tempFilePaths);
+        },
+        fail: (err) => {
+          console.warn('[publish-edit] wx.chooseMedia 失败，尝试降级到 wx.chooseImage:', err);
+          if (err && err.errMsg && err.errMsg.includes('cancel')) {
+            return; // 用户主动取消
+          }
+          // 降级使用 wx.chooseImage
+          wx.chooseImage({
+            count: maxCount,
+            sizeType: ['compressed'],
+            sourceType: ['album', 'camera'],
+            success: (imgRes) => {
+              handleUpload(imgRes.tempFilePaths || []);
+            },
+            fail: handleFail
+          });
+        }
+      });
+    } else {
+      wx.chooseImage({
+        count: maxCount,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          handleUpload(res.tempFilePaths || []);
+        },
+        fail: handleFail
+      });
+    }
   },
 
   // 预览大图
@@ -268,6 +310,10 @@ Page({
   async onSubmit() {
     const { form, images } = this.data;
 
+    if (!form.publisherRole) {
+      wx.showToast({ title: '请选择发布人身份', icon: 'none' });
+      return;
+    }
     if (!form.phone.trim()) {
       wx.showToast({ title: '请输入联系方式', icon: 'none' });
       return;
@@ -299,12 +345,12 @@ Page({
 
     try {
       const data = {
-        publisherRole: form.publisherRole || '本人',
+        publisherRole: form.publisherRole.trim(),
         phone: form.phone.trim(),
         name: form.name.trim(),
         gender: form.gender,
         age: ageNum,
-        housingLocation: form.housingLocation || '本地',
+        housingLocation: form.housingLocation.trim(),
         occupation: form.occupation.trim(),
         income: form.income,
         isPublicSector: form.isPublicSector,

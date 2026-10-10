@@ -128,12 +128,23 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="照片" width="70" align="center">
+        <el-table-column label="照片" width="100" align="center">
           <template #default="{ row }">
-            <span v-if="row.images && row.images.length" class="photo-badge">
-              📷 {{ row.images.length }}
-            </span>
-            <span v-else style="color: #c0c4cc;">-</span>
+            <div v-if="row.images && row.images.length" class="table-photo-cell">
+              <el-image
+                :src="formatImageUrl(row.images[0])"
+                :preview-src-list="formatImageList(row.images)"
+                :preview-teleported="true"
+                fit="cover"
+                class="table-thumb-img"
+              >
+                <template #error>
+                  <div class="image-slot-err">破损</div>
+                </template>
+              </el-image>
+              <span class="photo-count-badge" v-if="row.images.length > 1">+{{ row.images.length }}</span>
+            </div>
+            <span v-else style="color: #c0c4cc; font-size: 13px;">无图</span>
           </template>
         </el-table-column>
 
@@ -231,8 +242,9 @@
             <el-image
               v-for="(img, idx) in editForm.images"
               :key="idx"
-              :src="img"
-              :preview-src-list="editForm.images"
+              :src="formatImageUrl(img)"
+              :preview-src-list="formatImageList(editForm.images)"
+              :preview-teleported="true"
               class="preview-img"
               fit="cover"
             />
@@ -270,8 +282,9 @@
           <el-image
             v-for="(img, idx) in detailData.images"
             :key="idx"
-            :src="img"
-            :preview-src-list="detailData.images"
+            :src="formatImageUrl(img)"
+            :preview-src-list="formatImageList(detailData.images)"
+            :preview-teleported="true"
             class="preview-img"
             fit="cover"
           />
@@ -307,6 +320,30 @@ const editForm = ref({})
 
 const detailVisible = ref(false)
 const detailData = ref({})
+
+// 格式化图片 URL：处理相对路径 /uploads/... 并防错
+const formatImageUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    // 忽略无法在外网/电脑端渲染的微信临时文件路径
+    if (url.startsWith('http://tmp/')) return ''
+    return url
+  }
+  // 生产环境或本地开发相对路径补全
+  if (url.startsWith('/uploads/')) {
+    return url
+  }
+  if (url.startsWith('uploads/')) {
+    return '/' + url
+  }
+  return url
+}
+
+// 格式化整个图片预览列表
+const formatImageList = (images) => {
+  if (!Array.isArray(images)) return []
+  return images.map(img => formatImageUrl(img)).filter(Boolean)
+}
 
 const sourceLabel = (s) => {
   const map = { user: '用户发布', seed: '种子预置', import: '文本导入' }
@@ -467,6 +504,49 @@ onMounted(() => {
 .photo-badge {
   color: #409EFF;
   font-size: 12px;
+}
+
+.table-photo-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-thumb-img {
+  width: 46px;
+  height: 46px;
+  border-radius: 6px;
+  border: 1px solid #ebeef5;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.table-thumb-img:hover {
+  transform: scale(1.08);
+}
+
+.image-slot-err {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f7fa;
+  color: #c0c4cc;
+  font-size: 11px;
+}
+
+.photo-count-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  line-height: 1.2;
 }
 
 .pagination-box {

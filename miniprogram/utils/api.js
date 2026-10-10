@@ -4,7 +4,7 @@
 const BASE_URL = 'https://aibao.love/api';  // 生产环境服务器地址
 // const BASE_URL = 'http://127.0.0.1:5000/api';  // 本地开发调试地址
 /**
- * 通用请求方法
+ * 通用请求方法https://aibao.love/api
  */
 function request(path, options = {}) {
   const { method = 'GET', data = {}, header = {} } = options;

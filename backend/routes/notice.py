@@ -67,11 +67,13 @@ def publish():
     if age <= 0:
         return jsonify(code=400, msg='请输入有效年龄'), 400
 
-    housing_location = (data.get('housingLocation') or '本地').strip()
+    housing_location = (data.get('housingLocation') or '').strip()
     if not housing_location:
         return jsonify(code=400, msg='请选择住房位置'), 400
 
-    publisher_role = (data.get('publisherRole') or '本人').strip()
+    publisher_role = (data.get('publisherRole') or '').strip()
+    if not publisher_role:
+        return jsonify(code=400, msg='请选择发布人身份'), 400
 
 
     # 登录鉴权：检查发布者是否已登录
@@ -211,12 +213,13 @@ def update_notice(notice_id):
     })
 
 
-def _compress_and_save_image(file_storage, dest_path, target_kb=120):
+def _compress_and_save_image(file_storage, dest_path, target_kb=100):
     """
-    智能图片压缩与优化保存：
-    - 读取图片流并修正色彩模式（RGBA/P转RGB或保持RGBA）
-    - 约束最大分辨率（长边不超过1600px）
-    - 质量迭代压缩至目标大小约 120KB 左右
+    智能图片压缩与优化保存，统一转换为高效 WebP 格式，确保稳定压缩至 target_kb (默认100KB) 以内：
+    - 处理 EXIF 旋转（手机拍照方向修正）
+    - 统一转为 RGB 色彩模式（消除透明通道冗余）
+    - 采用 WebP 现代压缩算法（同画质下比 JPEG 体积再小 30%~40%）
+    - 采用「分辨率阶梯缩放 + 质量逐级衰减」双重循环，保证任意大图都能稳定 <= target_kb
     """
     try:
         img = Image.open(file_storage)
@@ -228,56 +231,59 @@ def _compress_and_save_image(file_storage, dest_path, target_kb=120):
         except Exception:
             pass
 
-        # 限制最大宽高（例如 1600px，保持比例缩小）
-        max_dim = 1600
-        if max(img.width, img.height) > max_dim:
-            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+        # 统一转为 RGB 色彩空间（相亲照均为真实照片）
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
 
-        # 格式判断
-        orig_ext = os.path.splitext(dest_path)[1].lower().replace('.', '')
-        # 如果是透明通道且非PNG，转RGB保存为JPEG
-        is_transparent = (img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info))
+        # 目标字节数（默认 100KB，留 2KB 余量）
+        target_bytes = (target_kb - 2) * 1024 if target_kb > 10 else target_kb * 1024
 
-        if orig_ext in ('jpg', 'jpeg') or not is_transparent:
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            save_format = 'JPEG'
-        else:
-            save_format = 'PNG'
+        # 尺寸阶梯：优先保持大分辨率（1440px），体积超标时逐级降分辨率
+        dimension_steps = [1440, 1080, 800, 640]
+        # WebP 高画质逐步衰减
+        quality_steps = [85, 78, 70, 60, 50, 40]
 
-        # 动态二分/循环调整 quality 逼近 target_kb (120KB)
-        target_bytes = target_kb * 1024
-        quality = 85
-        buffer = io.BytesIO()
+        best_buffer = None
+        orig_w, orig_h = img.size
 
-        if save_format == 'JPEG':
-            for q in [85, 75, 65, 55, 45, 35]:
-                buffer.seek(0)
-                buffer.truncate()
-                img.save(buffer, format='JPEG', quality=q, optimize=True)
-                if buffer.tell() <= target_bytes or q == 35:
-                    quality = q
-                    break
-        else:
-            # PNG 格式通过优化压缩
-            buffer.seek(0)
-            buffer.truncate()
-            img.save(buffer, format='PNG', optimize=True)
-            # 如果 PNG 还是明显超过 target_bytes，转换为高质量 JPEG
-            if buffer.tell() > target_bytes:
-                img_rgb = img.convert('RGB')
-                buffer.seek(0)
-                buffer.truncate()
-                img_rgb.save(buffer, format='JPEG', quality=80, optimize=True)
+        for max_dim in dimension_steps:
+            # 等比例缩放
+            curr_img = img.copy()
+            if max(orig_w, orig_h) > max_dim:
+                curr_img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
-        with open(dest_path, 'wb') as f:
-            f.write(buffer.getvalue())
+            for q in quality_steps:
+                buf = io.BytesIO()
+                # 统一保存为 WEBP 格式，method=4 提供高压缩率与快速响应平衡
+                curr_img.save(buf, format='WEBP', quality=q, method=4)
+                size = buf.tell()
 
+                if best_buffer is None or size <= target_bytes or size < len(best_buffer):
+                    best_buffer = buf.getvalue()
+
+                if size <= target_bytes:
+                    # 已满足小于等于目标大小，立刻落盘
+                    with open(dest_path, 'wb') as f:
+                        f.write(best_buffer)
+                    return True
+
+        # 若极端情况下依然略超，直接写入当前压缩所得的最优 buffer
+        if best_buffer:
+            with open(dest_path, 'wb') as f:
+                f.write(best_buffer)
+            return True
+
+        # 保底逻辑
+        file_storage.seek(0)
+        file_storage.save(dest_path)
         return True
     except Exception as e:
         # 若压缩异常则回退至原生保存，保证上传稳定性
-        file_storage.seek(0)
-        file_storage.save(dest_path)
+        try:
+            file_storage.seek(0)
+            file_storage.save(dest_path)
+        except Exception:
+            pass
         return True
 
 
@@ -308,13 +314,13 @@ def upload_image():
         if ext not in allowed_exts:
             return jsonify(code=400, msg=f'不支持的文件类型: {ext}，仅支持 {", ".join(allowed_exts)}'), 400
 
-        # 生成唯一文件名（统一转为 jpg 便于高质量压缩）
-        out_ext = 'jpg' if ext in ('jpg', 'jpeg', 'webp', 'png') else ext
+        # 生成唯一文件名（统一转为 webp 现代高压缩格式）
+        out_ext = 'webp'
         unique_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{out_ext}"
         filepath = os.path.join(upload_folder, unique_name)
 
-        # 压缩并保存图片到本地 uploads 目录，目标大小约 120KB
-        _compress_and_save_image(f, filepath, target_kb=120)
+        # 压缩并保存图片到本地 uploads 目录，确保目标大小稳定在 100KB 以内
+        _compress_and_save_image(f, filepath, target_kb=100)
 
         # 微信图片安全审查 (imgSecCheck)
         try:

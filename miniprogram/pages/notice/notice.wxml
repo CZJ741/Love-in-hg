@@ -194,6 +194,7 @@
               class="photo-thumb-lg"
               src="{{item}}"
               mode="aspectFill"
+              lazy-load="true"
               catchtap="onPreviewPhoto"
               data-src="{{item}}"
             />

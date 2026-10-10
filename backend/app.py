@@ -35,10 +35,50 @@ def create_app():
             resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD'
         return resp
 
-    # 根路径健康检查（避免 404 被误判为跨域问题）
+    # 根路径返回提示页面
     @app.route('/')
     def index():
-        return jsonify(code=0, msg='Love-in-hg backend is running', data={'service': '相亲角后端', 'status': 'ok'})
+        html_content = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务提示</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f7f8fa;
+            color: #333;
+        }
+        .container {
+            text-align: center;
+            padding: 30px 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+            max-width: 90%;
+            width: 500px;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p>本域名仅用于微信小程序[爱宝]后台 API 接口服务，不提供面向公众的网页内容。</p>
+    </div>
+</body>
+</html>"""
+        return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
     @app.route('/ping')
     def ping():

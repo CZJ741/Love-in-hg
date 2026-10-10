@@ -38,9 +38,9 @@
     <view class="ios-compliance-banner" wx:if="{{isIOS}}">
       <view class="ios-banner-top">
         <text class="ios-compliance-icon">ℹ️</text>
-        <text class="ios-compliance-text">由于微信小程序平台规范，iOS 设备暂不支持在小程序内直接开通。已开通特权支持全端自动互通！</text>
+        <text class="ios-compliance-text">由于微信小程序平台规范，iOS 设备暂不支持在小程序内直接开通。可复制链接前往网页开通</text>
       </view>
-      <button class="btn-copy-pay-link" bindtap="onCopyPayLink">复制外部专属开通链接</button>
+      <button class="btn-copy-pay-link" bindtap="onCopyPayLink">复制外部开通链接</button>
     </view>
 
     <view class="member-cards" wx:if="{{!isIOS}}">

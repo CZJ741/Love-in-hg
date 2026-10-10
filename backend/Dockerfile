@@ -20,9 +20,9 @@ WORKDIR /app
 # 先拷贝依赖清单，利用 Docker 层缓存
 COPY requirements.txt .
 
-# 安装依赖（gunicorn 的可执行文件会正确装到 /usr/local/bin/）
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+# 安装依赖（配置阿里云 PyPI 镜像源加速下载）
+RUN pip install --no-cache-dir --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ \
+    && pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 # 拷贝项目源码
 COPY . .
