@@ -94,16 +94,8 @@ def publish():
     if not is_safe:
         return jsonify(code=400, msg=sec_err or '内容包含违规或敏感信息，请修改后重试'), 400
 
-    # 用户存在则更新用户资料
+    # 发布者资料独立于启事对象资料。
     user = current_user
-    user.name = name
-    user.gender = gender
-    user.occupation = data.get('occupation', '')
-    user.income = data.get('income', '')
-    user.is_public_sector = data.get('isPublicSector', False)
-    user.height = data.get('height', 0) or 0
-    user.weight = data.get('weight', 0) or 0
-    user.updated_at = datetime.utcnow()
 
     # 一个手机号可发布多条启事，始终新增
     images_input = data.get('images', [])

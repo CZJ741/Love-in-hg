@@ -357,7 +357,7 @@ Page({
         height: form.height ? parseInt(form.height) : 0,
         weight: form.weight ? parseInt(form.weight) : 0,
         socialAccount: form.socialAccount ? form.socialAccount.trim() : '',
-        images: images || [],
+        images: await api.uploadImages(images || []),
         remark: form.remark.trim()
       };
 
@@ -376,10 +376,6 @@ Page({
           wx.removeStorageSync('publishNoticeDraft');
         }
 
-        wx.setStorageSync('userInfo', {
-          ...data,
-          id: res.data.userId || wx.getStorageSync('userId')
-        });
         if (!this.data.isEdit) {
           wx.setStorageSync('userId', String(res.data.userId));
         }

@@ -85,6 +85,7 @@ def create_app():
         return jsonify(code=0, msg='pong')
 
     # 静态文件访问：上传的图片 /uploads/<filename>
+    @app.route('/api/uploads/<path:filename>')
     @app.route('/uploads/<path:filename>')
     def uploaded_file(filename):
         upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads'))

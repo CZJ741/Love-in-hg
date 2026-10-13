@@ -45,6 +45,32 @@ Page({
     this.loadUserProfile();
   },
 
+  onEditName() {
+    if (!this.data.user.id) return;
+    wx.showModal({
+      title: '修改用户名称',
+      editable: true,
+      content: this.data.user.name || this.data.user.phone || '',
+      placeholderText: '请输入1至20个字符',
+      success: async (result) => {
+        if (!result.confirm) return;
+        const name = (result.content || '').trim();
+        if (!name || [...name].length > 20) {
+          wx.showToast({ title: '名称需为1至20个字符', icon: 'none' });
+          return;
+        }
+        const res = await api.updateUserName(name);
+        if (res.code !== 0) {
+          wx.showToast({ title: res.msg || '修改失败', icon: 'none' });
+          return;
+        }
+        wx.setStorageSync('userInfo', res.data.user);
+        await this.loadUserProfile();
+        wx.showToast({ title: '修改成功', icon: 'success' });
+      }
+    });
+  },
+
   async loadUserProfile() {
     const userInfo = wx.getStorageSync('userInfo');
     if (!userInfo) {
@@ -59,6 +85,7 @@ Page({
       const res = await api.getUserProfile();
       if (res.code === 0) {
         const { user, quota } = res.data;
+        wx.setStorageSync('userInfo', user);
         const remaining = quota.monthlyAssigned;
 
         const memberNames = { free: '普通用户', member: '会员', vip: '大会员' };

@@ -127,7 +127,7 @@ def run_reset():
             used_phones.add(p["phone"])
             user = User(
                 phone=p["phone"],
-                name=p["name"],
+                name=p["phone"],
                 gender=p["gender"],
                 occupation=p["occupation"],
                 income=p["income"],

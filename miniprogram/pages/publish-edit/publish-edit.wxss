@@ -102,7 +102,7 @@
   display: block;
 }
 
-/* 输入框与选择器统一规范（尺寸适当缩小，避免挤压） */
+/* 输入框与选择器统一规范（采用浅蓝色区分界面白底，提升层次感与精致度） */
 .form-input {
   box-sizing: border-box;
   width: 100%;
@@ -110,29 +110,30 @@
   min-height: 76rpx;
   line-height: 76rpx;
   padding: 0 20rpx;
-  border: 1.5rpx solid #e2e4e8;
+  border: 1.5rpx solid #d5e5f5;
   border-radius: 10rpx;
   font-size: 26rpx;
   color: #222;
-  background: #fafafa;
-  transition: border-color 0.2s, background-color 0.2s;
+  background: #f2f7fd;
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
 }
 
 .form-input:focus {
-  border-color: #ff9b7e;
-  background: #fff;
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 4rpx rgba(59, 130, 246, 0.12);
 }
 
 .form-input[disabled] {
-  background: #f4f4f5;
-  color: #909399;
-  border-color: #e4e7ed;
+  background: #eef3f8;
+  color: #94a3b8;
+  border-color: #e2e8f0;
 }
 
 .form-input[disabled].input-required {
-  background-color: #fff2ed !important;
-  color: #777;
-  border-color: #ffd8cc !important;
+  background-color: #e9f2fb !important;
+  color: #64748b;
+  border-color: #cbdcf0 !important;
 }
 
 .picker-value {
@@ -141,32 +142,125 @@
   height: 76rpx;
   line-height: 74rpx;
   padding: 0 20rpx;
-  border: 1.5rpx solid #e2e4e8;
+  border: 1.5rpx solid #d5e5f5;
   border-radius: 10rpx;
   font-size: 26rpx;
   color: #222;
-  background: #fafafa;
+  background: #f2f7fd;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: border-color 0.2s, background-color 0.2s;
 }
 
 .picker-value.placeholder {
-  color: #a8abb2;
+  color: #94a3b8;
 }
 
-/* 必填项专属浅橘红色背景 */
+/* 必填项背景优化（保持浅蓝协调基调并略加强调） */
 .input-required {
-  background-color: #fff7f4 !important;
-  border-color: #ffded4 !important;
+  background-color: #eef6fd !important;
+  border-color: #c8def6 !important;
 }
 
 .input-required:focus {
-  border-color: #ff7854 !important;
-  background-color: #fffbf9 !important;
+  border-color: #3b82f6 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 4rpx rgba(59, 130, 246, 0.12) !important;
 }
 
-/* 药丸/勾选式单选选项 (Choice Pills - 适当微缩尺寸) */
+/* 单选勾选组 (Radio Choice Group) */
+.radio-group-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20rpx;
+  padding: 6rpx 0;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  padding: 14rpx 24rpx;
+  background: #f2f7fd;
+  border: 1.5rpx solid #d5e5f5;
+  border-radius: 36rpx;
+  transition: all 0.2s ease;
+}
+
+.radio-circle {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  border: 2rpx solid #94a3b8;
+  background: #ffffff;
+  box-sizing: border-box;
+  margin-right: 14rpx;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.radio-circle.checked {
+  border-color: #3b82f6;
+  background: #3b82f6;
+}
+
+.radio-circle.checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.radio-label {
+  font-size: 26rpx;
+  color: #334155;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.radio-option.active {
+  background: #e8f2fe;
+  border-color: #93c5fd;
+}
+
+.radio-option.active .radio-label {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+/* 性别定制色系 */
+.radio-option.active-male {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+.radio-circle.checked-male {
+  border-color: #3b82f6;
+  background: #3b82f6;
+}
+.radio-option.active-male .radio-label {
+  color: #1d4ed8;
+}
+
+.radio-option.active-female {
+  background: #fdf2f8;
+  border-color: #fbcfe8;
+}
+.radio-circle.checked-female {
+  border-color: #ec4899;
+  background: #ec4899;
+}
+.radio-option.active-female .radio-label {
+  color: #be185d;
+}
+
+/* 药丸/勾选式单选选项 (Choice Pills - 适当微缩尺寸，用于其他可能选项) */
 .choice-pills {
   display: flex;
   gap: 14rpx;
@@ -180,8 +274,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f7f8fa;
-  border: 1.5rpx solid #e5e7eb;
+  background: #f4f8fc;
+  border: 1.5rpx solid #dbe7f3;
   border-radius: 10rpx;
   font-size: 26rpx;
   color: #4b5563;
@@ -254,19 +348,21 @@
 .form-textarea {
   box-sizing: border-box;
   width: 100%;
-  border: 1.5rpx solid #e2e4e8;
+  border: 1.5rpx solid #d5e5f5;
   border-radius: 10rpx;
   padding: 16rpx 20rpx;
   font-size: 26rpx;
   color: #222;
-  background: #fafafa;
+  background: #f2f7fd;
   min-height: 150rpx;
   line-height: 1.5;
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
 }
 
 .form-textarea:focus {
-  border-color: #ff9b7e;
-  background: #fff;
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 4rpx rgba(59, 130, 246, 0.12);
 }
 
 .char-count {

@@ -6,8 +6,32 @@ from models import db, User, Notice, NoticeView, MembershipOrder, UserBlock
 from services.quota_service import get_membership_limit, get_quota_info
 from utils.sms_service import sms_service
 from utils.file_cleaner import delete_notice_images
+from utils.wechat_security import WeChatSecurity
 
 user_bp = Blueprint('user', __name__)
+
+
+@user_bp.route('/profile', methods=['POST'])
+def update_profile():
+    user_id = request.headers.get('X-User-Id', '')
+    if not user_id.isdigit():
+        return jsonify(code=401, msg='请先登录'), 401
+    user = db.session.get(User, int(user_id))
+    if not user:
+        return jsonify(code=401, msg='用户不存在'), 401
+
+    data = request.get_json(silent=True) or {}
+    name = data.get('name')
+    if not isinstance(name, str) or not 1 <= len(name.strip()) <= 20:
+        return jsonify(code=400, msg='用户名称需为1至20个字符'), 400
+    is_safe, error = WeChatSecurity.check_text(name.strip(), openid=user.openid)
+    if not is_safe:
+        return jsonify(code=400, msg=error or '用户名称包含违规内容'), 400
+
+    user.name = name.strip()
+    user.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(code=0, msg='名称已修改', data={'user': user.to_dict()})
 
 
 @user_bp.route('/profile', methods=['GET'])

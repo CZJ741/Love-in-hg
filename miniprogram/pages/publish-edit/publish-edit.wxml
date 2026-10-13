@@ -17,16 +17,16 @@
 
     <view class="form-item">
       <text class="form-label">发布人身份 <text class="required">*</text></text>
-      <view class="choice-pills">
+      <view class="radio-group-wrap">
         <view
           wx:for="{{publisherRoles}}"
           wx:key="*this"
-          class="pill-item {{form.publisherRole === item ? 'pill-active' : ''}}"
+          class="radio-option {{form.publisherRole === item ? 'active' : ''}}"
           bindtap="onSelectPublisherRole"
           data-role="{{item}}"
         >
-          <text class="pill-check" wx:if="{{form.publisherRole === item}}">✓</text>
-          <text class="pill-text">{{item}}</text>
+          <view class="radio-circle {{form.publisherRole === item ? 'checked' : ''}}"></view>
+          <text class="radio-label">{{item}}</text>
         </view>
       </view>
     </view>
@@ -55,22 +55,22 @@
 
     <view class="form-item">
       <text class="form-label">性别 <text class="required">*</text></text>
-      <view class="choice-pills">
+      <view class="radio-group-wrap">
         <view
-          class="pill-item {{form.gender === '男' ? 'pill-active gender-male' : ''}}"
+          class="radio-option {{form.gender === '男' ? 'active active-male' : ''}}"
           bindtap="onSelectGender"
           data-value="男"
         >
-          <text class="pill-check" wx:if="{{form.gender === '男'}}">✓</text>
-          <text class="pill-text">男</text>
+          <view class="radio-circle {{form.gender === '男' ? 'checked checked-male' : ''}}"></view>
+          <text class="radio-label">男</text>
         </view>
         <view
-          class="pill-item {{form.gender === '女' ? 'pill-active gender-female' : ''}}"
+          class="radio-option {{form.gender === '女' ? 'active active-female' : ''}}"
           bindtap="onSelectGender"
           data-value="女"
         >
-          <text class="pill-check" wx:if="{{form.gender === '女'}}">✓</text>
-          <text class="pill-text">女</text>
+          <view class="radio-circle {{form.gender === '女' ? 'checked checked-female' : ''}}"></view>
+          <text class="radio-label">女</text>
         </view>
       </view>
     </view>
@@ -89,22 +89,22 @@
 
     <view class="form-item">
       <text class="form-label">住房位置 <text class="required">*</text></text>
-      <view class="choice-pills">
+      <view class="radio-group-wrap">
         <view
-          class="pill-item {{form.housingLocation === '本地' ? 'pill-active' : ''}}"
+          class="radio-option {{form.housingLocation === '本地' ? 'active' : ''}}"
           bindtap="onSelectHousingLocation"
           data-value="本地"
         >
-          <text class="pill-check" wx:if="{{form.housingLocation === '本地'}}">✓</text>
-          <text class="pill-text">本地</text>
+          <view class="radio-circle {{form.housingLocation === '本地' ? 'checked' : ''}}"></view>
+          <text class="radio-label">本地</text>
         </view>
         <view
-          class="pill-item {{form.housingLocation === '外地' ? 'pill-active' : ''}}"
+          class="radio-option {{form.housingLocation === '外地' ? 'active' : ''}}"
           bindtap="onSelectHousingLocation"
           data-value="外地"
         >
-          <text class="pill-check" wx:if="{{form.housingLocation === '外地'}}">✓</text>
-          <text class="pill-text">外地</text>
+          <view class="radio-circle {{form.housingLocation === '外地' ? 'checked' : ''}}"></view>
+          <text class="radio-label">外地</text>
         </view>
       </view>
     </view>
@@ -166,22 +166,22 @@
 
     <view class="form-item">
       <text class="form-label">是否体制内</text>
-      <view class="choice-pills">
+      <view class="radio-group-wrap">
         <view
-          class="pill-item {{form.isPublicSector === true ? 'pill-active' : ''}}"
+          class="radio-option {{form.isPublicSector === true ? 'active' : ''}}"
           bindtap="onSelectSector"
           data-value="{{true}}"
         >
-          <text class="pill-check" wx:if="{{form.isPublicSector === true}}">✓</text>
-          <text class="pill-text">是</text>
+          <view class="radio-circle {{form.isPublicSector === true ? 'checked' : ''}}"></view>
+          <text class="radio-label">是</text>
         </view>
         <view
-          class="pill-item {{form.isPublicSector === false ? 'pill-active' : ''}}"
+          class="radio-option {{form.isPublicSector === false ? 'active' : ''}}"
           bindtap="onSelectSector"
           data-value="{{false}}"
         >
-          <text class="pill-check" wx:if="{{form.isPublicSector === false}}">✓</text>
-          <text class="pill-text">否</text>
+          <view class="radio-circle {{form.isPublicSector === false ? 'checked' : ''}}"></view>
+          <text class="radio-label">否</text>
         </view>
       </view>
     </view>

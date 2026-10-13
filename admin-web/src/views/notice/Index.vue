@@ -296,6 +296,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { formatImageUrl, formatImageList } from '../../utils/image'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getNotices, getNoticeDetail, updateNotice, deleteNotice, batchDeleteNotices } from '../../api'
 
@@ -320,30 +321,6 @@ const editForm = ref({})
 
 const detailVisible = ref(false)
 const detailData = ref({})
-
-// 格式化图片 URL：处理相对路径 /uploads/... 并防错
-const formatImageUrl = (url) => {
-  if (!url) return ''
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    // 忽略无法在外网/电脑端渲染的微信临时文件路径
-    if (url.startsWith('http://tmp/')) return ''
-    return url
-  }
-  // 生产环境或本地开发相对路径补全
-  if (url.startsWith('/uploads/')) {
-    return url
-  }
-  if (url.startsWith('uploads/')) {
-    return '/' + url
-  }
-  return url
-}
-
-// 格式化整个图片预览列表
-const formatImageList = (images) => {
-  if (!Array.isArray(images)) return []
-  return images.map(img => formatImageUrl(img)).filter(Boolean)
-}
 
 const sourceLabel = (s) => {
   const map = { user: '用户发布', seed: '种子预置', import: '文本导入' }

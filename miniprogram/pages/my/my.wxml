@@ -5,7 +5,7 @@
     <view class="profile-header flex-row">
       <view class="avatar">{{userInitial}}</view>
       <view class="profile-info">
-        <text class="profile-name">{{user.name || (user.phone ? '用户 ' + maskedUserPhone : '未登录')}}</text>
+        <text class="profile-name" bindtap="onEditName">{{user.name || (user.phone ? '用户 ' + maskedUserPhone : '未登录')}}</text>
         <text class="profile-phone">{{user.phone || ''}}</text>
       </view>
       <text class="membership-badge {{membershipType}}">{{membershipName}}</text>

@@ -40,7 +40,7 @@ def login():
     if not user and notice:
         user = User(
             phone=phone,
-            name=notice.name,
+            name=phone,
             gender=notice.gender,
             occupation=notice.occupation or '',
             income=notice.income or '',
@@ -135,7 +135,7 @@ def verify_register():
         user = User(
             phone=phone,
             openid=openid,
-            name=notice.name if notice else f'用户{phone[-4:]}',
+            name=phone,
             gender=notice.gender if notice else '',
             occupation=notice.occupation or '' if notice else '',
             income=notice.income or '' if notice else '',

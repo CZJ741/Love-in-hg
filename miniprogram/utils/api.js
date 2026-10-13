@@ -269,7 +269,8 @@ async function uploadImages(filePaths) {
   const urls = [];
   for (const path of filePaths) {
     // 如果已经是网络图片或已有URL则不需要重新上传
-    if (path.startsWith('http://') || path.startsWith('https://')) {
+    const isLocalWechatFile = /^https?:\/\/(?:tmp|usr|store)(?:\/|$)/i.test(path);
+    if (/^https?:\/\//i.test(path) && !isLocalWechatFile) {
       urls.push(path);
     } else {
       const url = await uploadImage(path);
@@ -280,6 +281,7 @@ async function uploadImages(filePaths) {
 }
 
 module.exports = {
+  updateUserName: (name) => post('/user/profile', { name }),
   BASE_URL,
   request,
   get,
