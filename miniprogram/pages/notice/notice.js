@@ -327,6 +327,9 @@ Page({
         this.initData();
         wx.showToast({ title: '注册成功', icon: 'success' });
       } else {
+        if (res.msg && res.msg.includes('已注册')) {
+          this.setData({ authMode: 'login', loginPhone: phone });
+        }
         wx.showToast({ title: res.msg || '验证失败', icon: 'none' });
       }
     } catch (err) {
@@ -586,7 +589,8 @@ Page({
   },
 
   onGoPublish() {
-    wx.switchTab({ url: '/pages/publish/publish' });
+    wx.removeStorageSync('editNoticeData');
+    wx.navigateTo({ url: '/pages/publish-edit/publish-edit' });
   },
 
   onGoMy() {

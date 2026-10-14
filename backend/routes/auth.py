@@ -86,6 +86,10 @@ def send_sms():
     if not re.match(r'^1[3-9]\d{9}$', phone):
         return jsonify(code=400, msg='请输入正确的手机号码'), 400
 
+    # 检查是否已注册
+    if User.query.filter_by(phone=phone).first():
+        return jsonify(code=400, msg='该手机号已注册，请直接登录'), 400
+
     result = sms_service.send_verification_code(phone)
     if not result.get('success'):
         return jsonify(code=400, msg=result.get('msg', '发送失败')), 400
@@ -109,6 +113,11 @@ def verify_register():
     if not re.match(r'^1[3-9]\d{9}$', phone):
         return jsonify(code=400, msg='请输入正确的手机号码'), 400
 
+    # 优先检查手机号是否已被注册，避免重复注册及消耗验证码
+    existing_user = User.query.filter_by(phone=phone).first()
+    if existing_user:
+        return jsonify(code=400, msg='该手机号已注册，请直接登录'), 400
+
     if not sms_code:
         return jsonify(code=400, msg='请输入验证码'), 400
 
@@ -125,39 +134,30 @@ def verify_register():
         except Exception:
             pass
 
-    # 查找或创建用户
-    user = User.query.filter_by(phone=phone).first()
+    # 查找是否有种子/历史关联启事
     notice = Notice.query.filter_by(phone=phone).first()
 
-    is_new_user = False
-    if not user:
-        is_new_user = True
-        user = User(
-            phone=phone,
-            openid=openid,
-            name=phone,
-            gender=notice.gender if notice else '',
-            occupation=notice.occupation or '' if notice else '',
-            income=notice.income or '' if notice else '',
-            is_public_sector=notice.is_public_sector if notice else False,
-            height=notice.height or 0 if notice else 0,
-            weight=notice.weight or 0 if notice else 0,
-            membership_type='free',
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        db.session.add(user)
-        db.session.flush()
-    else:
-        if openid:
-            user.openid = openid
-
-    user.last_login_at = datetime.utcnow()
+    user = User(
+        phone=phone,
+        openid=openid,
+        name=phone,
+        gender=notice.gender if notice else '',
+        occupation=notice.occupation or '' if notice else '',
+        income=notice.income or '' if notice else '',
+        is_public_sector=notice.is_public_sector if notice else False,
+        height=notice.height or 0 if notice else 0,
+        weight=notice.weight or 0 if notice else 0,
+        membership_type='free',
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        last_login_at=datetime.utcnow()
+    )
+    db.session.add(user)
     db.session.commit()
 
-    return jsonify(code=0, msg='验证成功', data={
+    return jsonify(code=0, msg='注册成功', data={
         'user': user.to_dict(),
-        'isNewUser': is_new_user
+        'isNewUser': True
     })
 
 

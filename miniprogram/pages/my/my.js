@@ -230,6 +230,9 @@ Page({
         this.loadUserProfile();
         wx.showToast({ title: '注册成功', icon: 'success' });
       } else {
+        if (res.msg && res.msg.includes('已注册')) {
+          this.setData({ authMode: 'login', loginPhone: phone });
+        }
         wx.showToast({ title: res.msg || '验证失败', icon: 'none' });
       }
     } catch (err) {
