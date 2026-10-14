@@ -485,14 +485,13 @@ def admin_manual_fulfill_order(order_id):
 
 
 # ============================================================
-# 六、智能文本提取与批量种子导入 (保留并支持Token鉴权)
+# 六、智能文本提取与入库 (保留并支持Token鉴权)
 # ============================================================
 
-@admin_bp.route('/extractAndImport', methods=['POST'])
-def extract_and_import():
+@admin_bp.route('/extractPreview', methods=['POST'])
+def extract_preview():
     """
-    从长文本中提取键值对并入库。
-    兼容原有 X-Init-Password 及新版 Bearer Token 两种鉴权
+    智能文本解析预览（仅提取解析字段，不入库）
     """
     # 鉴权
     auth_header = request.headers.get('Authorization', '')
@@ -512,6 +511,51 @@ def extract_and_import():
         return jsonify(code=400, msg='文本内容不能为空'), 400
 
     extracted = extract_key_values(text)
+
+    phone = extracted.get('phone', '')
+    is_existing = False
+    existing_notice = None
+    if phone:
+        existing = Notice.query.filter_by(phone=phone).first()
+        if existing:
+            is_existing = True
+            existing_notice = {'id': existing.id, 'name': existing.name}
+
+    return jsonify(code=0, msg='提取成功', data={
+        'extracted': extracted,
+        'isExisting': is_existing,
+        'existingNotice': existing_notice
+    })
+
+
+@admin_bp.route('/extractAndImport', methods=['POST'])
+def extract_and_import():
+    """
+    从长文本或确认后的字段直接入库。
+    入参支持：
+    1. {"text": "..."} — 后端自动先提取再入库
+    2. {"notice": {...}} — 前端预览确认/微调后的字段直接入库
+    """
+    # 鉴权
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:].strip() if auth_header.startswith('Bearer ') else ''
+    init_pwd = request.headers.get('X-Init-Password', '')
+
+    from utils.admin_auth import verify_admin_token
+    is_valid_token = bool(verify_admin_token(token))
+    is_valid_pwd = (init_pwd == Config.ADMIN_PASSWORD)
+
+    if not is_valid_token and not is_valid_pwd:
+        return jsonify(code=401, msg='未授权访问'), 401
+
+    data = request.get_json() or {}
+    if 'notice' in data and isinstance(data['notice'], dict):
+        extracted = data['notice']
+    else:
+        text = data.get('text', '')
+        if not text:
+            return jsonify(code=400, msg='文本内容不能为空'), 400
+        extracted = extract_key_values(text)
 
     # 必填校验：姓名、性别
     if not extracted.get('name'):
@@ -554,73 +598,6 @@ def extract_and_import():
         'noticeId': notice.id,
         'extracted': extracted
     })
-
-
-@admin_bp.route('/initData', methods=['POST'])
-def init_data():
-    """从 sql/seed_notices.json 导入初始种子数据"""
-    auth_header = request.headers.get('Authorization', '')
-    token = auth_header[7:].strip() if auth_header.startswith('Bearer ') else ''
-    init_pwd = request.headers.get('X-Init-Password', '')
-
-    from utils.admin_auth import verify_admin_token
-    is_valid_token = bool(verify_admin_token(token))
-    is_valid_pwd = (init_pwd == Config.ADMIN_PASSWORD)
-
-    if not is_valid_token and not is_valid_pwd:
-        return jsonify(code=401, msg='未授权访问'), 401
-
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    seed_path = os.path.join(base_dir, 'sql', 'seed_notices.json')
-
-    try:
-        with open(seed_path, 'r', encoding='utf-8') as f:
-            seeds = json.load(f)
-    except FileNotFoundError:
-        return jsonify(code=500, msg='种子数据文件不存在: sql/seed_notices.json'), 500
-
-    success, skip, errors = 0, 0, []
-
-    for item in seeds:
-        try:
-            existing = Notice.query.filter_by(phone=item.get('phone', '')).first()
-            if existing:
-                skip += 1
-                continue
-
-            age_val = int(item.get('age', 0) or 0)
-            if age_val <= 0 and item.get('birthday'):
-                match = re.search(r'(\d{4})', str(item.get('birthday')))
-                if match:
-                    age_val = datetime.now().year - int(match.group(1))
-
-            notice = Notice(
-                user_id=0,
-                phone=item.get('phone', ''),
-                name=item.get('name', ''),
-                nickname=item.get('nickname', ''),
-                gender=item.get('gender', ''),
-                age=age_val,
-                social_account=item.get('socialAccount', '') or item.get('social_account', ''),
-                occupation=item.get('occupation', ''),
-                income=item.get('income', ''),
-                is_public_sector=item.get('isPublicSector', False),
-                height=item.get('height', 0),
-                weight=item.get('weight', 0),
-                remark=item.get('remark', ''),
-                source='seed',
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-            db.session.add(notice)
-            success += 1
-        except Exception as e:
-            errors.append({'phone': item.get('phone'), 'error': str(e)})
-
-    db.session.commit()
-
-    return jsonify(code=0, msg=f'导入完成: 成功{success}, 跳过{skip}, 失败{len(errors)}',
-                   data={'successCount': success, 'skipCount': skip, 'errorCount': len(errors)})
 
 
 # ============================================================

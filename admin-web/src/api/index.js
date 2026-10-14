@@ -24,9 +24,9 @@ export const updateUserQuota = (userId, data) => request.put(`/users/${userId}/q
 export const getOrders = (params) => request.get('/orders', { params })
 export const fulfillOrder = (orderId) => request.post(`/orders/${orderId}/fulfill`)
 
-// 6. 智能导入与种子数据
-export const extractAndImport = (text) => request.post('/extractAndImport', { text })
-export const initSeedData = () => request.post('/initData')
+// 6. 智能提取与确认入库
+export const extractPreview = (text) => request.post('/extractPreview', { text })
+export const extractAndImport = (data) => request.post('/extractAndImport', data)
 
 // 7. UGC 举报管理
 export const getReports = (params) => request.get('/reports', { params })
