@@ -27,3 +27,7 @@ export const fulfillOrder = (orderId) => request.post(`/orders/${orderId}/fulfil
 // 6. 智能导入与种子数据
 export const extractAndImport = (text) => request.post('/extractAndImport', { text })
 export const initSeedData = () => request.post('/initData')
+
+// 7. UGC 举报管理
+export const getReports = (params) => request.get('/reports', { params })
+export const handleReport = (reportId, data) => request.post(`/reports/${reportId}/handle`, data)

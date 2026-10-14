@@ -649,8 +649,14 @@ def admin_get_reports():
         reporter = User.query.get(r.reporter_id)
         notice = Notice.query.get(r.notice_id)
         item['reporterPhone'] = reporter.phone if reporter else ''
-        item['noticeName'] = notice.name if notice else '[已删除]'
+        item['reporterName'] = reporter.name if reporter else ''
+        item['noticeName'] = notice.name if notice else '[已下架/删除]'
         item['noticePhone'] = notice.phone if notice else ''
+        item['noticeGender'] = notice.gender if notice else ''
+        item['noticeAge'] = notice.age if notice else 0
+        item['noticeUserId'] = notice.user_id if notice else 0
+        item['noticeRemark'] = notice.remark if notice else ''
+        item['noticeImages'] = notice.to_dict().get('images', []) if notice else []
         items.append(item)
 
     return jsonify(code=0, data={

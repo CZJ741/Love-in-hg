@@ -38,6 +38,12 @@ const routes = [
         meta: { title: '订单与支付对账', icon: 'Money' }
       },
       {
+        path: 'report',
+        name: 'Report',
+        component: () => import('../views/report/Index.vue'),
+        meta: { title: '投诉与违规举报', icon: 'Warning' }
+      },
+      {
         path: 'import',
         name: 'Import',
         component: () => import('../views/import/Index.vue'),

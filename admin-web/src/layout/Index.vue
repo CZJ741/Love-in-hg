@@ -30,6 +30,10 @@
           <el-icon><Money /></el-icon>
           <span>订单与对账</span>
         </el-menu-item>
+        <el-menu-item index="/report">
+          <el-icon><Warning /></el-icon>
+          <span>投诉与举报</span>
+        </el-menu-item>
         <el-menu-item index="/import">
           <el-icon><Upload /></el-icon>
           <span>智能提取与导入</span>
